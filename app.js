@@ -331,6 +331,17 @@
     }, function () { $('entryStatus').textContent = 'Paste မရ — လက်နဲ့ ထည့်ပါ'; });
   });
 
+  // In-app hedge transfer (Pho Oct 22): the clipboard round-trip
+  // (copy over-limit text -> paste on the entry board) is blocked by
+  // Chrome, so the excess lines go straight from app state to the board.
+  on('overBtn', 'click', function () {
+    if (!overLines) { $('entryStatus').textContent = 'အကျွံ မရှိ'; return; }
+    var b = $('board');
+    b.value = (b.value.trim() ? b.value.replace(/\n*$/, '\n') : '') + overLines + '\n';
+    parseBoard();
+    $('entryStatus').textContent = 'အကျွံ ထည့်ပြီး — စစ် ပြီး သိမ်းပါ';
+  });
+
   $('saveBtn').addEventListener('click', function () {
     var pid = $('entryPerson').value;
     if (!pid) return;
