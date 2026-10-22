@@ -61,139 +61,129 @@
     var raw = (line == null ? '' : String(line)).trim();
     if (!raw) return invalid(raw);
     var s = normalizeDigits(raw);
-    var m, amount, nums, i;
+    var m;
 
-    // /// — the ten triples
-    m = s.match(/^\/\/\/\s*[=\-]?\s*(\d+)$/);
-    if (m) {
-      amount = parseInt(m[1], 10);
-      if (!(amount > 0)) return invalid(raw);
-      nums = [];
-      for (i = 0; i <= 9; i++) nums.push('' + i + i + i);
-      return finish(nums, amount, raw, 'triples');
-    }
-
-    // Series keywords (Pho Oct 22): 29ထိပ်စီးရီး500 ≡ /29, 29အလည်စီးရီး ≡ 2/9,
-    // 29နောက်စီးရီး ≡ 29/ — 10 numbers, amount per number.
-    m = s.match(/^(\d)(\d)\s*(ထိပ်စီးရီး|အလည်စီးရီး|နောက်စီးရီး)\s*[=\-]?\s*(\d+)$/);
-    if (m) {
-      amount = parseInt(m[4], 10);
-      if (!(amount > 0)) return invalid(raw);
-      nums = [];
-      for (i = 0; i <= 9; i++) {
-        if (m[3] === 'ထိပ်စီးရီး') nums.push('' + i + m[1] + m[2]);
-        else if (m[3] === 'အလည်စီးရီး') nums.push(m[1] + i + m[2]);
-        else nums.push(m[1] + m[2] + i);
-      }
-      return finish(nums, amount, raw, 'series');
-    }
-
-    // /23 — head position is any digit
-    m = s.match(/^\/(\d)(\d)\s*[=\-]?\s*(\d+)$/);
-    if (m) {
-      amount = parseInt(m[3], 10);
-      if (!(amount > 0)) return invalid(raw);
-      nums = [];
-      for (i = 0; i <= 9; i++) nums.push('' + i + m[1] + m[2]);
-      return finish(nums, amount, raw, 'series');
-    }
-
-    // 2/3 — middle position is any digit
-    m = s.match(/^(\d)\/(\d)\s*[=\-]?\s*(\d+)$/);
-    if (m) {
-      amount = parseInt(m[3], 10);
-      if (!(amount > 0)) return invalid(raw);
-      nums = [];
-      for (i = 0; i <= 9; i++) nums.push(m[1] + i + m[2]);
-      return finish(nums, amount, raw, 'series');
-    }
-
-    // 23/ — tail position is any digit
-    m = s.match(/^(\d)(\d)\/\s*[=\-]?\s*(\d+)$/);
-    if (m) {
-      amount = parseInt(m[3], 10);
-      if (!(amount > 0)) return invalid(raw);
-      nums = [];
-      for (i = 0; i <= 9; i++) nums.push(m[1] + m[2] + i);
-      return finish(nums, amount, raw, 'series');
-    }
-
-    // ဒဲ့ + ကျန်/အာ split pricing (Pho Oct 22): 123ဒဲ့1000အာ500 —
-    // straight number at the ဒဲ့ amount, each REMAINING distinct
-    // permutation at the second amount (အာ and ကျန် equivalent here).
+    // Dae + Kyan split pricing (single plain number only, Pho Oct 22):
+    // 123dae1000ar500 - straight at the dae amount, remaining perms at second.
     m = s.match(/^(\d)(\d)(\d)\s*ဒဲ့\s*\-?\s*(\d+)\s*(?:အာ|ကျန်)\s*\-?\s*(\d+)$/);
     if (m) {
       var dAmt = parseInt(m[4], 10), rAmt = parseInt(m[5], 10);
       if (!(dAmt > 0) || !(rAmt > 0)) return invalid(raw);
       var straight = m[1] + m[2] + m[3];
-      var items = [{ number: straight, amount: dAmt }];
+      var dItems = [{ number: straight, amount: dAmt }];
       perms3(m[1], m[2], m[3]).forEach(function (pn) {
-        if (pn !== straight) items.push({ number: pn, amount: rAmt });
+        if (pn !== straight) dItems.push({ number: pn, amount: rAmt });
       });
-      return finishItems(items, raw, 'daekyan');
+      return finishItems(dItems, raw, 'daekyan');
     }
 
-    // Number lists (Pho Oct 22): separators - , . ~ between 3-digit numbers.
-    // Split: list/single + =A + R + B -> listed at A each, remaining perms at B each.
-    m = s.match(/^(\d{3}(?:\s*[-~,.]\s*\d{3})*)\s*=\s*(\d+)\s*(?:R|r|အာ)\s*(\d+)$/);
-    if (m) {
-      var subs = m[1].split(/\s*[-~,.]\s*/);
-      var sAmt = parseInt(m[2], 10), oAmt = parseInt(m[3], 10);
+    // General member-list parser (Pho's symbol canon, Oct 22):
+    // line = MEMBERS joined by separators ~ - , . * plus one TAIL.
+    // Members: 123 | slash series /23 2/3 23/ | keyword series 29series |
+    //          triple set /// or its keyword names (10 numbers).
+    // Tails: (=|space) A straight | (@|R|r) A perms | = A (R|r) B split.
+    var TRIPLES = ['000', '111', '222', '333', '444', '555', '666', '777', '888', '999'];
+    function matchMember(str) {
+      var mm, i;
+      if (str.indexOf('///') === 0) return { nums: TRIPLES, len: 3, bareOk: true };
+      mm = str.match(/^ထွိုင်ဆယ်ကွက်|^ထွိုင်|^အပူးစုံ/);
+      if (mm) return { nums: TRIPLES, len: mm[0].length, bareOk: true };
+      mm = str.match(/^(\d)(\d)\s*(ထိပ်|အလယ်|အလည်|နောက်)စီးရီး/);
+      if (mm) {
+        var a = mm[1], b = mm[2], out = [];
+        if (mm[3] === 'ထိပ်') { for (i = 0; i < 10; i++) out.push(String(i) + a + b); }
+        else if (mm[3] === 'အလယ်' || mm[3] === 'အလည်') { for (i = 0; i < 10; i++) out.push(a + String(i) + b); }
+        else { for (i = 0; i < 10; i++) out.push(a + b + String(i)); }
+        return { nums: out, len: mm[0].length, bareOk: true };
+      }
+      mm = str.match(/^(\d{0,2})\/(\d{0,2})/);
+      if (mm && (mm[1].length + mm[2].length) === 2) {
+        var pre = mm[1], post = mm[2], res = [], k;
+        var digs = (pre + post).split('');
+        if (pre.length === 0) { for (k = 0; k < 10; k++) res.push(String(k) + digs[0] + digs[1]); }
+        else if (post.length === 0) { for (k = 0; k < 10; k++) res.push(digs[0] + digs[1] + String(k)); }
+        else { for (k = 0; k < 10; k++) res.push(digs[0] + String(k) + digs[1]); }
+        return { nums: res, len: mm[0].length, bareOk: true };
+      }
+      mm = str.match(/^\d{3}/);
+      if (mm) return { nums: [mm[0]], len: 3 };
+      return null;
+    }
+
+    var members = [], lastSep = null, pos = 0, rest = null;
+    while (true) {
+      var mem = matchMember(s.slice(pos));
+      if (!mem) return invalid(raw);
+      members.push(mem);
+      pos += mem.len;
+      var savePos = pos;
+      while (pos < s.length && s[pos] === ' ') pos++;
+      if (pos >= s.length) { rest = ''; break; }
+      var ch = s[pos];
+      if (ch === '-' || ch === '~' || ch === ',' || ch === '.' || ch === '*') {
+        lastSep = ch; pos++;
+        while (pos < s.length && s[pos] === ' ') pos++;
+        if (pos >= s.length) return invalid(raw);
+        continue;
+      }
+      rest = s.slice(savePos);
+      break;
+    }
+
+    var seen = {}, S = [];
+    members.forEach(function (mem2) {
+      mem2.nums.forEach(function (n) { if (!seen[n]) { seen[n] = 1; S.push(n); } });
+    });
+
+    if (rest === '') {
+      // Dash-amount fallback: exactly 123-500 reads as number + amount.
+      if (members.length === 2 && lastSep === '-' && members[1].nums.length === 1) {
+        var amt0 = parseInt(members[1].nums[0], 10);
+        if (amt0 > 0) return finish(members[0].nums, amt0, raw, members[0].nums.length === 1 ? 'single' : 'list');
+      }
+      return invalid(raw);
+    }
+
+    var tm;
+    // Split tail: = A (R|r|ar) B
+    tm = rest.match(/^\s*=\s*(\d+)\s*(?:R|r|အာ)\s*(\d+)$/);
+    if (tm) {
+      var sAmt = parseInt(tm[1], 10), oAmt = parseInt(tm[2], 10);
       if (!(sAmt > 0) || !(oAmt > 0)) return invalid(raw);
-      var seenS = {}, items = [];
-      subs.forEach(function (n) {
-        if (!seenS[n]) { seenS[n] = 1; items.push({ number: n, amount: sAmt }); }
-      });
-      subs.forEach(function (n) {
+      var inS = {}, items = S.map(function (n) { inS[n] = 1; return { number: n, amount: sAmt }; });
+      S.forEach(function (n) {
         perms3(n[0], n[1], n[2]).forEach(function (pn) {
-          if (!seenS[pn]) { seenS[pn] = 1; items.push({ number: pn, amount: oAmt }); }
+          if (!inS[pn]) { inS[pn] = 1; items.push({ number: pn, amount: oAmt }); }
         });
       });
-      var r = finishItems(items, raw, 'split');
-      r.head = subs.length;
-      return r;
+      var rr = finishItems(items, raw, 'split');
+      rr.head = S.length;
+      return rr;
     }
-
-    // List, one price: list + =A -> each listed number at A.
-    m = s.match(/^(\d{3}(?:\s*[-~,.]\s*\d{3})+)\s*=\s*(\d+)$/);
-    if (m) {
-      amount = parseInt(m[2], 10);
-      if (!(amount > 0)) return invalid(raw);
-      return finish(m[1].split(/\s*[-~,.]\s*/), amount, raw, 'list');
-    }
-
-    // List permutations: list + marker + A -> union of perms of each, at A.
-    m = s.match(/^(\d{3}(?:\s*[-~,.]\s*\d{3})+)\s*(?:@|R|r|\*|အာ)\s*(\d+)$/);
-    if (m) {
-      amount = parseInt(m[2], 10);
-      if (!(amount > 0)) return invalid(raw);
+    // Permutation tail: (@|R|r|ar) A
+    tm = rest.match(/^\s*(?:@|R|r|အာ)\s*(\d+)$/);
+    if (tm) {
+      var pAmt = parseInt(tm[1], 10);
+      if (!(pAmt > 0)) return invalid(raw);
       var seenP = {}, all = [];
-      m[1].split(/\s*[-~,.]\s*/).forEach(function (n) {
+      S.forEach(function (n) {
         perms3(n[0], n[1], n[2]).forEach(function (pn) {
           if (!seenP[pn]) { seenP[pn] = 1; all.push(pn); }
         });
       });
-      return finish(all, amount, raw, 'listperm');
+      return finish(all, pAmt, raw, (members.length === 1 && S.length === 1) ? 'perm' : 'listperm');
     }
-
-    // Permutation: 123@500 — markers @ R r * အာ are equivalent
-    m = s.match(/^(\d)(\d)(\d)\s*(?:@|R|r|\*|အာ)\s*[=\-]?\s*(\d+)$/);
-    if (m) {
-      amount = parseInt(m[4], 10);
-      if (!(amount > 0)) return invalid(raw);
-      return finish(perms3(m[1], m[2], m[3]), amount, raw, 'perm');
+    // Straight tail: = A or space A
+    tm = rest.match(/^\s*=\s*(\d+)$/) || rest.match(/^\s+(\d+)$/);
+    if (!tm && members[members.length - 1].bareOk) tm = rest.match(/^\s*(\d+)$/);
+    if (tm) {
+      var tAmt = parseInt(tm[1], 10);
+      if (!(tAmt > 0)) return invalid(raw);
+      return finish(S, tAmt, raw, (members.length === 1 && S.length === 1) ? 'single' : 'list');
     }
-
-    // Single: 123=500 / 123-500 / 123 500
-    m = s.match(/^(\d{3})\s*[=\- ]\s*(\d+)$/);
-    if (m) {
-      amount = parseInt(m[2], 10);
-      if (!(amount > 0)) return invalid(raw);
-      return finish([m[1]], amount, raw, 'single');
-    }
-
     return invalid(raw);
   }
+
 
   var api = { parseLine: parseLine };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
