@@ -234,6 +234,88 @@
   $('board').addEventListener('input', parseBoard);
   $('entryPerson').addEventListener('change', parseBoard);
 
+  /* ---------- photo scan intake (Pho Oct 22) ----------
+     Pick a photo -> cloud OCR (ocr.space engine 3, handwriting) ->
+     cleaned DRAFT lines appended to the board. Nothing is saved by the
+     scan: Pho checks every line on the board, then presses Save.
+     Cleanup never invents an amount: bare numbers are grouped into one
+     list line WITHOUT a price; totals/symbol-only lines are dropped. */
+  function scanCleanup(text) {
+    var out = [], bareRun = [];
+    function flushBare() {
+      if (bareRun.length) { out.push(bareRun.join(',')); bareRun = []; }
+    }
+    String(text || '').split(/\r?\n/).forEach(function (ln) {
+      var s = ln.replace(/[^0-9.\- ]/g, '').replace(/\s+/g, '');
+      var m = s.match(/^(\d{3})[-.](\d{3,})$/);
+      if (m) { flushBare(); out.push(m[1] + '=' + m[2]); return; }
+      if (/^\d{3}$/.test(s)) { bareRun.push(s); return; }
+      if (/^\d{3}[-.]$/.test(s)) { bareRun.push(s.slice(0, 3)); return; }
+      // anything else (totals, separators, junk) is not a bet line: drop
+    });
+    flushBare();
+    return out.length ? out.join('\n') + '\n' : '';
+  }
+  window.ScanClean = scanCleanup;
+
+  function shrinkImage(file) {
+    return new Promise(function (resolve) {
+      var url, img = new Image();
+      var done = false;
+      function fin(b) { if (!done) { done = true; resolve(b || file); } }
+      try { url = URL.createObjectURL(file); } catch (e) { return fin(null); }
+      img.onload = function () {
+        try {
+          var max = 1600, w = img.width, hgt = img.height;
+          var sc = Math.min(1, max / Math.max(w, hgt));
+          var cv = document.createElement('canvas');
+          cv.width = Math.round(w * sc); cv.height = Math.round(hgt * sc);
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          if (cv.toBlob) cv.toBlob(function (b) { fin(b); }, 'image/jpeg', 0.85);
+          else fin(null);
+        } catch (e) { fin(null); }
+      };
+      img.onerror = function () { fin(null); };
+      setTimeout(function () { fin(null); }, 4000);
+      img.src = url;
+    });
+  }
+
+  function ocrImage(blob) {
+    var fd = new FormData();
+    fd.append('file', blob, 'scan.jpg');
+    fd.append('apikey', 'helloworld');
+    fd.append('OCREngine', '3');
+    fd.append('scale', 'true');
+    return fetch('https://api.ocr.space/parse/image', { method: 'POST', body: fd })
+      .then(function (res) { return res.json(); })
+      .then(function (d) {
+        if (!d || !d.ParsedResults || !d.ParsedResults.length) throw new Error('ocr');
+        return d.ParsedResults[0].ParsedText || '';
+      });
+  }
+
+  $('scanBtn').addEventListener('click', function () { $('scanFile').click(); });
+  $('scanFile').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    this.value = '';
+    if (!f) return;
+    $('entryStatus').textContent = 'စကန် ဖတ် နေ တယ်…';
+    shrinkImage(f).then(ocrImage).then(function (text) {
+      var draft = scanCleanup(text);
+      if (!draft) {
+        $('entryStatus').textContent = 'စကန် က ဘာ မှ မဖတ် ရ — ပုံ ကြည် အောင် ပြန် ရိုက် ပါ';
+        return;
+      }
+      var b = $('board');
+      b.value = (b.value.trim() ? b.value.replace(/\n*$/, '\n') : '') + draft;
+      parseBoard();
+      $('entryStatus').textContent = 'စကန် ပြီး — ဘုတ် မှာ တိုက် စစ် ပါ';
+    }).catch(function () {
+      $('entryStatus').textContent = 'စကန် မရ — internet စစ် ပြီး ပြန် ကြိုး စား ပါ';
+    });
+  });
+
   $('pasteBtn').addEventListener('click', function () {
     if (!(navigator.clipboard && navigator.clipboard.readText)) {
       $('entryStatus').textContent = 'Paste မရ — လက်နဲ့ ထည့်ပါ'; return;

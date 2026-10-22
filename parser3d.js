@@ -77,6 +77,47 @@
       return finishItems(dItems, raw, 'daekyan');
     }
 
+    // Bettor typed formats (Pho Oct 22, from forwarded Viber messages):
+    // (a) Chained-= list: 750=755=214=1000 -> numbers share the last amount.
+    if (s.indexOf('=') !== -1) {
+      var parts = s.split('=');
+      var lastP = parts[parts.length - 1].trim();
+      var headParts = parts.slice(0, -1).map(function (x) { return x.trim(); });
+      if (parts.length >= 2 && /^\d+$/.test(lastP) &&
+          headParts.every(function (x) { return /^\d{3}$/.test(x); })) {
+        var cAmt = parseInt(lastP, 10);
+        if (cAmt > 0) return finish(headParts, cAmt, raw, headParts.length === 1 ? 'single' : 'list');
+      }
+    }
+    // (b) Dots split: 387...500r100 -> straight @500, remaining perms @100.
+    m = s.match(/^(\d{3})\.{2,}\s*(\d+)\s*(?:r|R|အာ|@)\s*(\d+)$/);
+    if (m) {
+      var dA2 = parseInt(m[2], 10), rA2 = parseInt(m[3], 10);
+      if (!(dA2 > 0) || !(rA2 > 0)) return invalid(raw);
+      var st2 = m[1];
+      var it2 = [{ number: st2, amount: dA2 }];
+      perms3(st2[0], st2[1], st2[2]).forEach(function (pn) {
+        if (pn !== st2) it2.push({ number: pn, amount: rA2 });
+      });
+      var rr2 = finishItems(it2, raw, 'split');
+      rr2.head = 1;
+      return rr2;
+    }
+    // (c) Dots straight: 387...500 -> 387 @500.
+    m = s.match(/^(\d{3})\.{2,}\s*(\d+)$/);
+    if (m) {
+      var dA3 = parseInt(m[2], 10);
+      if (!(dA3 > 0)) return invalid(raw);
+      return finish([m[1]], dA3, raw, 'single');
+    }
+    // (d) Dot amount (typed like the handwritten slips): 740.1000 / 740. 1000.
+    m = s.match(/^(\d{3})\.\s*(\d+)$/);
+    if (m) {
+      var dA4 = parseInt(m[2], 10);
+      if (!(dA4 > 0)) return invalid(raw);
+      return finish([m[1]], dA4, raw, 'single');
+    }
+
     // General member-list parser (Pho's symbol canon, Oct 22):
     // line = MEMBERS joined by separators ~ - , . * plus one TAIL.
     // Members: 123 | slash series /23 2/3 23/ | keyword series 29series |
