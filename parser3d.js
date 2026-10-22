@@ -146,7 +146,7 @@
 
     var tm;
     // Split tail: = A (R|r|ar) B
-    tm = rest.match(/^\s*=\s*(\d+)\s*(?:R|r|အာ)\s*(\d+)$/);
+    tm = rest.match(/^\s*=\s*(\d+)\s*(?:R|r|အာ|@)\s*(\d+)$/);
     if (tm) {
       var sAmt = parseInt(tm[1], 10), oAmt = parseInt(tm[2], 10);
       if (!(sAmt > 0) || !(oAmt > 0)) return invalid(raw);
