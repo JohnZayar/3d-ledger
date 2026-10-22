@@ -66,8 +66,14 @@
     return state.records.filter(function (r) { return r.sessionId === sid; });
   }
   function totalsByNumber() {
+    // Net exposure per number: bettor bets add, အကန် (hedge) bets SUBTRACT —
+    // the hedge bookie carries that part, so it must not inflate အကျွံ.
     var map = {};
-    sessRecords().forEach(function (r) { map[r.number] = (map[r.number] || 0) + r.amount; });
+    sessRecords().forEach(function (r) {
+      var p = person(r.personId);
+      var sign = (p && p.role === 'akan') ? -1 : 1;
+      map[r.number] = (map[r.number] || 0) + sign * r.amount;
+    });
     return map;
   }
   function fmtDate(iso) {
@@ -124,7 +130,10 @@
 
   /* ---------- home ---------- */
   function renderHome() {
-    var t = sessRecords().reduce(function (a, r) { return a + r.amount; }, 0);
+    var t = sessRecords().reduce(function (a, r) {
+      var p = person(r.personId);
+      return a + ((p && p.role === 'akan') ? -r.amount : r.amount);
+    }, 0);
     $('homeTotal').textContent = fmt(t);
   }
 
@@ -273,6 +282,7 @@
       var num = String(hundred * 100 + i).padStart(3, '0');
       var amt = totals[num] || 0;
       var cls = 'cell';
+      if (amt < 0) cls += ' hed';
       if (amt > s.limit) cls += ' hot';
       if (s.winning && s.winning === num) cls += ' win';
       html += '<div class="' + cls + '"><div class="n">' + num + '</div><div class="a">' +
