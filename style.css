@@ -108,3 +108,16 @@ table.grid.akan th { background: #3a2323; }
 
 .cell.hed { border-color: #3f5a3f; }
 .cell.hed .a { color: #8fce8f; }
+
+/* voucher: no text selection / callout on long-press (Pho Oct 22) */
+.vt { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.vline:active { background: #2c2c31; }
+/* line action sheet */
+.sheet { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 60;
+  display: flex; align-items: flex-end; justify-content: center; }
+.sheetCard { background: #1d1d20; width: 100%; max-width: 520px; padding: 16px;
+  border-radius: 16px 16px 0 0; border-top: 1px solid #3a3a40; }
+.sheetTitle { font-weight: 700; font-size: 17px; margin-bottom: 12px; word-break: break-all; }
+.sheetCard .btn { display: block; width: 100%; margin: 8px 0; padding: 13px; font-size: 16px; }
+.sheetInput { width: 100%; box-sizing: border-box; padding: 12px; font-size: 17px;
+  border-radius: 10px; border: 1px solid #3a3a40; background: #141416; color: #f2e7c9; margin-bottom: 8px; }

@@ -400,7 +400,7 @@
         var label = esc(lineRecs[0].formula);
         if (lineRecs[0].isFormula || lineRecs.length > 1) label += ' (' + lineRecs.length + ')';
         var xid = 'x' + bn + '-' + li;
-        body += '<tr class="vline" data-x="' + xid + '"><td class="frm">' + label + '</td>' +
+        body += '<tr class="vline" data-x="' + xid + '" data-line="' + lineRecs[0].lineId + '"><td class="frm">' + label + '</td>' +
           '<td class="amt">' + fmt(lt) + '</td></tr>';
         var chips = lineRecs.map(function (r) { return '<span>' + r.number + ' · ' + fmt(r.amount) + '</span>'; }).join('');
         body += '<tr id="' + xid + '" style="display:none"><td class="xpand" colspan="2"><div class="xgrid">' + chips + '</div></td></tr>';
@@ -412,11 +412,87 @@
     box.innerHTML = html;
     box.querySelectorAll('.vline').forEach(function (tr) {
       tr.addEventListener('click', function () {
+        if (suppressClick) { suppressClick = false; return; }
         var x = document.getElementById(tr.getAttribute('data-x'));
         if (x) x.style.display = x.style.display === 'none' ? 'table-row' : 'none';
       });
+      // Long-press (Pho Oct 22): action menu - edit / delete this line.
+      var timer = null;
+      tr.addEventListener('pointerdown', function () {
+        timer = setTimeout(function () {
+          suppressClick = true;
+          openLineMenu(tr.getAttribute('data-line'));
+        }, 550);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
+        tr.addEventListener(ev, function () { if (timer) clearTimeout(timer); });
+      });
+      tr.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     });
   }
+
+  /* ---------- voucher line edit / delete ---------- */
+  var suppressClick = false, menuLineId = null;
+  function lineRecsOf(lineId) {
+    return state.records.filter(function (r) { return r.lineId === lineId && r.sessionId === sess().id; });
+  }
+  function closeLineMenu() { $('lineMenu').style.display = 'none'; menuLineId = null; }
+  function openLineMenu(lineId) {
+    var recs = lineRecsOf(lineId);
+    if (!recs.length) return;
+    menuLineId = lineId;
+    $('lmTitle').textContent = recs[0].formula;
+    $('lmView').style.display = 'block';
+    $('lmEdit').style.display = 'none';
+    $('lineMenu').style.display = 'flex';
+  }
+  $('lmCloseBtn').addEventListener('click', closeLineMenu);
+  $('lineMenu').addEventListener('click', function (e) { if (e.target === $('lineMenu')) closeLineMenu(); });
+  $('lmDelBtn').addEventListener('click', function () {
+    var recs = lineRecsOf(menuLineId);
+    if (!recs.length) return closeLineMenu();
+    if (!confirm('ဒီ လိုင်း ဖျက် မလား? ' + recs[0].formula)) return;
+    state.records = state.records.filter(function (r) { return r.lineId !== menuLineId; });
+    save(); render(); closeLineMenu();
+  });
+  $('lmEditBtn').addEventListener('click', function () {
+    var recs = lineRecsOf(menuLineId);
+    if (!recs.length) return closeLineMenu();
+    $('lmView').style.display = 'none';
+    $('lmEdit').style.display = 'block';
+    $('lmInput').value = recs[0].formula;
+    $('lmHint').textContent = '';
+  });
+  $('lmBackBtn').addEventListener('click', function () {
+    $('lmEdit').style.display = 'none';
+    $('lmView').style.display = 'block';
+  });
+  $('lmInput').addEventListener('input', function () {
+    var r = window.Parser3D.parseLine($('lmInput').value);
+    $('lmHint').textContent = r.ok
+      ? '→ ' + r.count + ' ကွက် · ' + fmt(r.total)
+      : 'ပုံစံ မမှန် — သိမ်း လို့ မရ';
+  });
+  $('lmSaveBtn').addEventListener('click', function () {
+    var recs = lineRecsOf(menuLineId);
+    if (!recs.length) return closeLineMenu();
+    var r = window.Parser3D.parseLine($('lmInput').value);
+    if (!r.ok) { $('lmHint').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
+    var first = recs[0];
+    var idx = state.records.indexOf(first);
+    state.records = state.records.filter(function (x) { return x.lineId !== menuLineId; });
+    var newLineId = uid();
+    var newRecs = r.items.map(function (it) {
+      return {
+        id: uid(), sessionId: first.sessionId, personId: first.personId,
+        batchNo: first.batchNo, lineId: newLineId, number: it.number,
+        amount: it.amount, formula: r.formula, isFormula: r.kind !== 'single'
+      };
+    });
+    // Splice back at the same position so voucher line order never moves.
+    newRecs.forEach(function (rec, i) { state.records.splice(idx + i, 0, rec); });
+    save(); render(); closeLineMenu();
+  });
 
   /* ---------- over-limit ---------- */
   var overLines = '';
