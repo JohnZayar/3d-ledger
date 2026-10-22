@@ -45,6 +45,9 @@
 
   /* ---------- helpers ---------- */
   function $(id) { return document.getElementById(id); }
+  // Null-safe wiring: if the HTML is a cached older version, a missing
+  // element must never stop the app from booting (Pho's black screen, Oct 22).
+  function on(id, ev, fn) { var el = $(id); if (el) el.addEventListener(ev, fn); }
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -295,8 +298,8 @@
       });
   }
 
-  $('scanBtn').addEventListener('click', function () { $('scanFile').click(); });
-  $('scanFile').addEventListener('change', function () {
+  on('scanBtn', 'click', function () { var sf = $('scanFile'); if (sf) sf.click(); });
+  on('scanFile', 'change', function () {
     var f = this.files && this.files[0];
     this.value = '';
     if (!f) return;
@@ -518,8 +521,9 @@
   function lineRecsOf(lineId) {
     return state.records.filter(function (r) { return r.lineId === lineId && r.sessionId === sess().id; });
   }
-  function closeLineMenu() { $('lineMenu').style.display = 'none'; menuLineId = null; }
+  function closeLineMenu() { var lm = $('lineMenu'); if (lm) lm.style.display = 'none'; menuLineId = null; }
   function openLineMenu(lineId) {
+    if (!$('lineMenu')) return;
     var recs = lineRecsOf(lineId);
     if (!recs.length) return;
     menuLineId = lineId;
@@ -528,16 +532,16 @@
     $('lmEdit').style.display = 'none';
     $('lineMenu').style.display = 'flex';
   }
-  $('lmCloseBtn').addEventListener('click', closeLineMenu);
-  $('lineMenu').addEventListener('click', function (e) { if (e.target === $('lineMenu')) closeLineMenu(); });
-  $('lmDelBtn').addEventListener('click', function () {
+  on('lmCloseBtn', 'click', closeLineMenu);
+  on('lineMenu', 'click', function (e) { if (e.target === $('lineMenu')) closeLineMenu(); });
+  on('lmDelBtn', 'click', function () {
     var recs = lineRecsOf(menuLineId);
     if (!recs.length) return closeLineMenu();
     if (!confirm('ဒီ လိုင်း ဖျက် မလား? ' + recs[0].formula)) return;
     state.records = state.records.filter(function (r) { return r.lineId !== menuLineId; });
     save(); render(); closeLineMenu();
   });
-  $('lmEditBtn').addEventListener('click', function () {
+  on('lmEditBtn', 'click', function () {
     var recs = lineRecsOf(menuLineId);
     if (!recs.length) return closeLineMenu();
     $('lmView').style.display = 'none';
@@ -545,17 +549,17 @@
     $('lmInput').value = recs[0].formula;
     $('lmHint').textContent = '';
   });
-  $('lmBackBtn').addEventListener('click', function () {
+  on('lmBackBtn', 'click', function () {
     $('lmEdit').style.display = 'none';
     $('lmView').style.display = 'block';
   });
-  $('lmInput').addEventListener('input', function () {
+  on('lmInput', 'input', function () {
     var r = window.Parser3D.parseLine($('lmInput').value);
     $('lmHint').textContent = r.ok
       ? '→ ' + r.count + ' ကွက် · ' + fmt(r.total)
       : 'ပုံစံ မမှန် — သိမ်း လို့ မရ';
   });
-  $('lmSaveBtn').addEventListener('click', function () {
+  on('lmSaveBtn', 'click', function () {
     var recs = lineRecsOf(menuLineId);
     if (!recs.length) return closeLineMenu();
     var r = window.Parser3D.parseLine($('lmInput').value);
