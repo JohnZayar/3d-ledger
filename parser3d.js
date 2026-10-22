@@ -1,0 +1,138 @@
+/* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ *
+ * Pure function:
+ *   parseLine(line) -> { ok, items: [{number, amount}], formula, count, total, kind }
+ *   - number: 3-char string, leading zeros kept ("023")
+ *   - amount: per-ကွက် (every expanded number gets the full amount)
+ *   - formula: the line verbatim as typed (for voucher display)
+ *   - kind: 'single' | 'perm' | 'series' | 'triples' | null
+ *
+ * Canon:
+ *   123=500 / 123-500 / 123 500        single
+ *   123@500 (also R r * အာ)            all distinct permutations
+ *   /23, 2/3, 23/  + amount            slash = any digit 0-9 in that spot (10)
+ *   /// + amount                       the ten triples 000,111,...,999
+ * Burmese digits in the input are normalized before parsing.
+ * Anything else is invalid — never guessed.
+ */
+(function (global) {
+  'use strict';
+
+  var BURMESE = {
+    '၀': '0', '၁': '1', '၂': '2', '၃': '3', '၄': '4',
+    '၅': '5', '၆': '6', '၇': '7', '၈': '8', '၉': '9'
+  };
+
+  function normalizeDigits(s) {
+    return String(s).replace(/[၀-၉]/g, function (c) { return BURMESE[c]; });
+  }
+
+  // Distinct permutations of 3 digits, first-occurrence order.
+  function perms3(a, b, c) {
+    var src = [a, b, c];
+    var order = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    var seen = {}, out = [];
+    for (var i = 0; i < order.length; i++) {
+      var o = order[i];
+      var s = src[o[0]] + src[o[1]] + src[o[2]];
+      if (!seen[s]) { seen[s] = 1; out.push(s); }
+    }
+    return out;
+  }
+
+  function finish(numbers, amount, formula, kind) {
+    var items = numbers.map(function (n) { return { number: n, amount: amount }; });
+    return {
+      ok: true, items: items, formula: formula,
+      count: items.length, total: amount * items.length, kind: kind
+    };
+  }
+
+  function invalid(formula) {
+    return { ok: false, items: [], formula: formula, count: 0, total: 0, kind: null };
+  }
+
+  function parseLine(line) {
+    var raw = (line == null ? '' : String(line)).trim();
+    if (!raw) return invalid(raw);
+    var s = normalizeDigits(raw);
+    var m, amount, nums, i;
+
+    // /// — the ten triples
+    m = s.match(/^\/\/\/\s*[=\-]?\s*(\d+)$/);
+    if (m) {
+      amount = parseInt(m[1], 10);
+      if (!(amount > 0)) return invalid(raw);
+      nums = [];
+      for (i = 0; i <= 9; i++) nums.push('' + i + i + i);
+      return finish(nums, amount, raw, 'triples');
+    }
+
+    // Series keywords (Pho Oct 22): 29ထိပ်စီးရီး500 ≡ /29, 29အလည်စီးရီး ≡ 2/9,
+    // 29နောက်စီးရီး ≡ 29/ — 10 numbers, amount per number.
+    m = s.match(/^(\d)(\d)\s*(ထိပ်စီးရီး|အလည်စီးရီး|နောက်စီးရီး)\s*[=\-]?\s*(\d+)$/);
+    if (m) {
+      amount = parseInt(m[4], 10);
+      if (!(amount > 0)) return invalid(raw);
+      nums = [];
+      for (i = 0; i <= 9; i++) {
+        if (m[3] === 'ထိပ်စီးရီး') nums.push('' + i + m[1] + m[2]);
+        else if (m[3] === 'အလည်စီးရီး') nums.push(m[1] + i + m[2]);
+        else nums.push(m[1] + m[2] + i);
+      }
+      return finish(nums, amount, raw, 'series');
+    }
+
+    // /23 — head position is any digit
+    m = s.match(/^\/(\d)(\d)\s*[=\-]?\s*(\d+)$/);
+    if (m) {
+      amount = parseInt(m[3], 10);
+      if (!(amount > 0)) return invalid(raw);
+      nums = [];
+      for (i = 0; i <= 9; i++) nums.push('' + i + m[1] + m[2]);
+      return finish(nums, amount, raw, 'series');
+    }
+
+    // 2/3 — middle position is any digit
+    m = s.match(/^(\d)\/(\d)\s*[=\-]?\s*(\d+)$/);
+    if (m) {
+      amount = parseInt(m[3], 10);
+      if (!(amount > 0)) return invalid(raw);
+      nums = [];
+      for (i = 0; i <= 9; i++) nums.push(m[1] + i + m[2]);
+      return finish(nums, amount, raw, 'series');
+    }
+
+    // 23/ — tail position is any digit
+    m = s.match(/^(\d)(\d)\/\s*[=\-]?\s*(\d+)$/);
+    if (m) {
+      amount = parseInt(m[3], 10);
+      if (!(amount > 0)) return invalid(raw);
+      nums = [];
+      for (i = 0; i <= 9; i++) nums.push(m[1] + m[2] + i);
+      return finish(nums, amount, raw, 'series');
+    }
+
+    // Permutation: 123@500 — markers @ R r * အာ are equivalent
+    m = s.match(/^(\d)(\d)(\d)\s*(?:@|R|r|\*|အာ)\s*[=\-]?\s*(\d+)$/);
+    if (m) {
+      amount = parseInt(m[4], 10);
+      if (!(amount > 0)) return invalid(raw);
+      return finish(perms3(m[1], m[2], m[3]), amount, raw, 'perm');
+    }
+
+    // Single: 123=500 / 123-500 / 123 500
+    m = s.match(/^(\d{3})\s*[=\- ]\s*(\d+)$/);
+    if (m) {
+      amount = parseInt(m[2], 10);
+      if (!(amount > 0)) return invalid(raw);
+      return finish([m[1]], amount, raw, 'single');
+    }
+
+    return invalid(raw);
+  }
+
+  var api = { parseLine: parseLine };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  global.Parser3D = api;
+})(typeof window !== 'undefined' ? window : globalThis);
