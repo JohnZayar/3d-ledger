@@ -118,6 +118,56 @@
       return finish([m[1]], dA4, raw, 'single');
     }
 
+    // Space-separated subjects (Pho Oct 22): "567 765 15000k1000"-family.
+    // Split with optional kyan-count check + stacked marker.
+    m = s.match(/^(\d{3}(?:\s+\d{3})+?)\s*(\d+)\s*(?:ကျန်အာ|ကျန်|အာ|R|r|@)\s*(?:(\d+)\s*ကွက်\s*)?(\d+)$/);
+    if (m) {
+      var subs2 = m[1].split(/\s+/);
+      var sA = parseInt(m[2], 10), oA = parseInt(m[4], 10);
+      if (!(sA > 0) || !(oA > 0)) return invalid(raw);
+      var seen2 = {}, S2 = [];
+      subs2.forEach(function (n) { if (!seen2[n]) { seen2[n] = 1; S2.push(n); } });
+      var items2 = S2.map(function (n) { return { number: n, amount: sA }; });
+      var inS2 = {}; S2.forEach(function (n) { inS2[n] = 1; });
+      S2.forEach(function (n) {
+        perms3(n[0], n[1], n[2]).forEach(function (pn) {
+          if (!inS2[pn]) { inS2[pn] = 1; items2.push({ number: pn, amount: oA }); }
+        });
+      });
+      // If the bettor wrote the remaining count (k<n>), it must agree.
+      if (m[3] !== undefined && parseInt(m[3], 10) !== items2.length - S2.length) return invalid(raw);
+      var rS = finishItems(items2, raw, 'split');
+      rS.head = S2.length;
+      return rS;
+    }
+    // Space subjects + ကျန်<count>ကွက် form: "567 765 15000k4q5000".
+    m = s.match(/^(\d{3}(?:\s+\d{3})+?)\s*(\d+)ကျန်\s*(\d+)\s*ကွက်\s*(\d+)$/);
+    if (m) {
+      var subs3 = m[1].split(/\s+/);
+      var sA3 = parseInt(m[2], 10), cnt3 = parseInt(m[3], 10), oA3 = parseInt(m[4], 10);
+      if (!(sA3 > 0) || !(oA3 > 0)) return invalid(raw);
+      var seen3 = {}, S3 = [];
+      subs3.forEach(function (n) { if (!seen3[n]) { seen3[n] = 1; S3.push(n); } });
+      var items3 = S3.map(function (n) { return { number: n, amount: sA3 }; });
+      var inS3 = {}; S3.forEach(function (n) { inS3[n] = 1; });
+      S3.forEach(function (n) {
+        perms3(n[0], n[1], n[2]).forEach(function (pn) {
+          if (!inS3[pn]) { inS3[pn] = 1; items3.push({ number: pn, amount: oA3 }); }
+        });
+      });
+      if (cnt3 !== items3.length - S3.length) return invalid(raw);
+      var rS3 = finishItems(items3, raw, 'split');
+      rS3.head = S3.length;
+      return rS3;
+    }
+    // Space subjects, straight list: "567 765 15000".
+    m = s.match(/^(\d{3}(?:\s+\d{3})+?)\s+(\d+)$/);
+    if (m) {
+      var sA4 = parseInt(m[2], 10);
+      if (!(sA4 > 0)) return invalid(raw);
+      return finish(m[1].split(/\s+/), sA4, raw, 'list');
+    }
+
     // General member-list parser (Pho's symbol canon, Oct 22):
     // line = MEMBERS joined by separators ~ - , . * plus one TAIL.
     // Members: 123 | slash series /23 2/3 23/ | keyword series 29series |
@@ -187,7 +237,7 @@
 
     var tm;
     // Split tail: = A (R|r|ar) B
-    tm = rest.match(/^\s*=\s*(\d+)\s*(?:R|r|အာ|@)\s*(\d+)$/);
+    tm = rest.match(/^\s*=\s*(\d+)\s*(?:ကျန်အာ|ကျန်|R|r|အာ|@)\s*(\d+)$/);
     if (tm) {
       var sAmt = parseInt(tm[1], 10), oAmt = parseInt(tm[2], 10);
       if (!(sAmt > 0) || !(oAmt > 0)) return invalid(raw);
