@@ -154,16 +154,20 @@
     if (keepV && person(keepV)) vp.value = keepV;
     // list
     $('peopleList').innerHTML = state.people.map(function (p) {
-      return '<div class="prow">' + (p.role === 'akan' ? '<span class="tag">အကန်</span>' : '') + '<span class="nm">' + esc(p.name) + '</span>' +
-        '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '-' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' + (p.closedLimit != null ? '<span>ပိတ် ' + esc(fmt(p.closedLimit)) + '</span>' : '') +
-        '<button class="del" data-del="' + p.id + '">ဖျက်</button></div>';
+      return '<div class="prow" data-pid="' + p.id + '">' + (p.role === 'akan' ? '<span class="tag">အကန်</span>' : '') + '<span class="nm">' + esc(p.name) + '</span>' +
+        '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '-' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' + (p.closedLimit != null ? '<span>ပိတ် ' + esc(fmt(p.closedLimit)) + '</span>' : '') + '</div>';
     }).join('');
-    document.querySelectorAll('[data-del]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var id = b.getAttribute('data-del');
-        state.people = state.people.filter(function (p) { return p.id !== id; });
-        save(); render();
+    // Long-press a row (Pho Oct 22): edit / delete menu, same pattern
+    // as the voucher line menu.
+    $('peopleList').querySelectorAll('.prow').forEach(function (row) {
+      var timer = null;
+      row.addEventListener('pointerdown', function () {
+        timer = setTimeout(function () { openPersonMenu(row.getAttribute('data-pid')); }, 550);
       });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
+        row.addEventListener(ev, function () { if (timer) clearTimeout(timer); });
+      });
+      row.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     });
   }
   // Pho Oct 22: numbers only - the dash inserts itself after the
@@ -631,6 +635,66 @@
     // Splice back at the same position so voucher line order never moves.
     newRecs.forEach(function (rec, i) { state.records.splice(idx + i, 0, rec); });
     save(); render(); closeLineMenu();
+  });
+
+  /* ---------- person edit / delete (long-press menu) ---------- */
+  var menuPersonId = null;
+  function closePersonMenu() { var pm = $('personMenu'); if (pm) pm.style.display = 'none'; menuPersonId = null; }
+  function openPersonMenu(pid) {
+    if (!$('personMenu')) return;
+    var p = person(pid); if (!p) return;
+    menuPersonId = pid;
+    $('pmTitle').textContent = p.name + (p.role === 'akan' ? ' (\u1021\u1000\u1014\u103a)' : '');
+    $('pmView').style.display = 'block';
+    $('pmEdit').style.display = 'none';
+    $('personMenu').style.display = 'flex';
+  }
+  on('pmCloseBtn', 'click', closePersonMenu);
+  on('personMenu', 'click', function (e) { if (e.target === $('personMenu')) closePersonMenu(); });
+  on('pmDelBtn', 'click', function () {
+    var p = person(menuPersonId); if (!p) return closePersonMenu();
+    var n = state.records.filter(function (r) { return r.personId === p.id; }).length;
+    if (!confirm('\u1012\u102e \u101c\u1030 \u1016\u103b\u1000\u103a \u1019\u101c\u102c\u1038? ' + p.name + (n ? ' \u2014 \u1005\u102c\u101b\u1004\u103a\u1038 ' + n + ' \u1001\u102f \u101b\u103e\u102d \u1014\u1031 \u1010\u101a\u103a, \u1021\u1032 \u1005\u102c\u101b\u1004\u103a\u1038 \u1010\u103d\u1031 \u1015\u102b \u1015\u103b\u1031\u102c\u1000\u103a \u1019\u101a\u103a' : ''))) return;
+    state.people = state.people.filter(function (x) { return x.id !== p.id; });
+    state.records = state.records.filter(function (r) { return r.personId !== p.id; });
+    save(); render(); closePersonMenu();
+  });
+  on('pmEditBtn', 'click', function () {
+    var p = person(menuPersonId); if (!p) return closePersonMenu();
+    $('pmView').style.display = 'none';
+    $('pmEdit').style.display = 'block';
+    $('pmName').value = p.name;
+    $('pmRole').value = p.role;
+    $('pmPayout').value = p.payout + (p.tote ? '-' + p.tote : '');
+    $('pmComm').value = p.commission;
+    $('pmClosed').value = p.closedLimit == null ? '' : p.closedLimit;
+    $('pmHint').textContent = '';
+  });
+  on('pmBackBtn', 'click', function () {
+    $('pmEdit').style.display = 'none';
+    $('pmView').style.display = 'block';
+  });
+  on('pmPayout', 'input', function () {
+    var d = normNum($('pmPayout').value).replace(/\D/g, '');
+    $('pmPayout').value = d.length >= 3 ? d.slice(0, 3) + '-' + d.slice(3) : d;
+  });
+  on('pmSaveBtn', 'click', function () {
+    var p = person(menuPersonId); if (!p) return closePersonMenu();
+    var name = $('pmName').value.trim();
+    var pr = normNum($('pmPayout').value).split(/[\/-]/);
+    var payout = Number(pr[0]);
+    var tote = (pr.length > 1 && pr[1] !== '') ? Number(pr[1]) : 0;
+    var commRaw = $('pmComm').value.trim();
+    if (!name || !(payout > 0) || commRaw === '') {
+      $('pmHint').textContent = '\u1021\u1019\u100a\u103a / \u1021\u1006 / \u1000\u1031\u102c\u103a \u1021\u1000\u102f\u1014\u103a \u1016\u103c\u100a\u1037\u203a\u1015\u102b';
+      return;
+    }
+    p.name = name; p.role = $('pmRole').value; p.payout = payout; p.tote = tote;
+    p.commission = Number(normNum(commRaw));
+    var pcv = $('pmClosed').value.trim();
+    var cl = Number(normNum(pcv));
+    p.closedLimit = (pcv === '' || isNaN(cl)) ? null : cl;
+    save(); render(); closePersonMenu();
   });
 
   /* ---------- blocked numbers (Pho Oct 22) ---------- */

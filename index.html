@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>3D Master</title>
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
 <div class="app">
@@ -110,7 +110,7 @@
   <!-- ဆက်တင် -->
   <section class="sec" id="sec-settings">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
-    <div class="setrow"><span>App Version</span><b>v21</b></div>
+    <div class="setrow"><span>App Version</span><b>v22</b></div>
     <div class="setrow"><span>App Reset</span><button class="danger" id="resetBtn">အကုန် ရှင်း</button></div>
   </section>
 
@@ -128,8 +128,29 @@
   </div>
 </div>
 
+<div id="personMenu" class="sheet" style="display:none">
+  <div class="sheetCard">
+    <div class="sheetTitle" id="pmTitle"></div>
+    <div id="pmView">
+      <button class="btn" id="pmEditBtn">ပြင်မည်</button>
+      <button class="btn danger" id="pmDelBtn">ဖျက်မည်</button>
+      <button class="btn gray" id="pmCloseBtn">ပိတ်မည်</button>
+    </div>
+    <div id="pmEdit" style="display:none">
+      <input id="pmName" class="sheetInput" autocomplete="off" placeholder="အမည်">
+      <select id="pmRole" class="sheetInput"><option value="bettor">ထိုးသား</option><option value="akan">အကန်ဒိုင်</option></select>
+      <input id="pmPayout" class="sheetInput" inputmode="numeric" autocomplete="off" placeholder="အဆ-တွဒ် (550-10)">
+      <input id="pmComm" class="sheetInput" inputmode="numeric" autocomplete="off" placeholder="ကော်%">
+      <input id="pmClosed" class="sheetInput" inputmode="numeric" autocomplete="off" placeholder="ပိတ်ဂဏန်း limit (ဗလာ = မရှိ)">
+      <div class="status" id="pmHint"></div>
+      <button class="btn" id="pmSaveBtn">သိမ်းမည်</button>
+      <button class="btn gray" id="pmBackBtn">မသိမ်းတော့</button>
+    </div>
+  </div>
+</div>
+
 <script src="parser3d.js?v=11"></script>
-<script src="app.js?v=21"></script>
+<script src="app.js?v=22"></script>
 
 <div id="lineMenu" class="sheet" style="display:none">
   <div class="sheetCard">
