@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>3D Master</title>
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 <div class="app">
@@ -26,6 +26,7 @@
       <div class="tile" data-go="daily">နေ့ချုပ်</div>
       <div class="tile" data-go="voucher">ဘောက်ချာ</div>
       <div class="tile" data-go="over">အကျွံ</div>
+      <div class="tile" data-go="blocked">ဒိုင်ပိတ်</div>
       <div class="tile" data-go="people">လူစာရင်း</div>
       <div class="tile" data-go="settings">ဆက်တင်</div>
     </div>
@@ -82,6 +83,15 @@
     <div class="status" id="overStatus"></div>
   </section>
 
+  <!-- ဒိုင်ပိတ် -->
+  <section class="sec" id="sec-blocked">
+    <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဒိုင်ပိတ် ဂဏန်း</h2></div>
+    <div class="frow"><input class="inp" id="blockedInput" placeholder="ဂဏန်း (527, 325 ...)"><button class="sbtn" id="blockedAdd">ထည့်</button></div>
+    <div class="status" id="blockedStatus"></div>
+    <div id="blockedList"></div>
+    <div class="bhint">ဒီ ပွဲစဉ် အတွက် ပဲ — ဂဏန်း ကို နှိပ် ရင် ပြန် ဖြုတ် မယ်</div>
+  </section>
+
   <!-- လူစာရင်း -->
   <section class="sec" id="sec-people">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>လူစာရင်း</h2></div>
@@ -91,6 +101,7 @@
       <input class="inp" id="pPayout" type="text" inputmode="numeric" placeholder="အဆ-တွဒ် (550-10)">
       <input class="inp" id="pComm" type="number" inputmode="numeric" placeholder="ကော်% (25/15/10)">
     </div>
+    <input class="inp" id="pClosed" type="number" inputmode="numeric" placeholder="ပိတ်ဂဏန်း limit တကွက် (ဗလာ = limit မရှိ)">
     <button class="btn" id="addPersonBtn">ထည့်မည်</button>
     <div class="status" id="peopleStatus"></div>
     <div id="peopleList" style="margin-top:10px"></div>
@@ -99,7 +110,7 @@
   <!-- ဆက်တင် -->
   <section class="sec" id="sec-settings">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
-    <div class="setrow"><span>App Version</span><b>v20</b></div>
+    <div class="setrow"><span>App Version</span><b>v21</b></div>
     <div class="setrow"><span>App Reset</span><button class="danger" id="resetBtn">အကုန် ရှင်း</button></div>
   </section>
 
@@ -118,7 +129,7 @@
 </div>
 
 <script src="parser3d.js?v=11"></script>
-<script src="app.js?v=20"></script>
+<script src="app.js?v=21"></script>
 
 <div id="lineMenu" class="sheet" style="display:none">
   <div class="sheetCard">

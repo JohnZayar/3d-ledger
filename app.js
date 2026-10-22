@@ -155,7 +155,7 @@
     // list
     $('peopleList').innerHTML = state.people.map(function (p) {
       return '<div class="prow">' + (p.role === 'akan' ? '<span class="tag">အကန်</span>' : '') + '<span class="nm">' + esc(p.name) + '</span>' +
-        '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '-' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' +
+        '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '-' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' + (p.closedLimit != null ? '<span>ပိတ် ' + esc(fmt(p.closedLimit)) + '</span>' : '') +
         '<button class="del" data-del="' + p.id + '">ဖျက်</button></div>';
     }).join('');
     document.querySelectorAll('[data-del]').forEach(function (b) {
@@ -184,8 +184,10 @@
       $('peopleStatus').textContent = 'အမည် / အဆ / ကော် အကုန် ဖြည့်ပါ';
       return;
     }
-    state.people.push({ id: uid(), name: name, payout: payout, tote: tote, commission: comm, role: $('pRole').value });
-    $('pName').value = ''; $('pPayout').value = ''; $('pComm').value = '';
+    var pcEl = $('pClosed');
+    var closedLimit = (pcEl && pcEl.value.trim() !== '') ? Number(normNum(pcEl.value)) : null;
+    state.people.push({ id: uid(), name: name, payout: payout, tote: tote, commission: comm, role: $('pRole').value, closedLimit: closedLimit });
+    $('pName').value = ''; $('pPayout').value = ''; $('pComm').value = ''; if (pcEl) pcEl.value = '';
     $('peopleStatus').textContent = '';
     save(); render();
   });
@@ -358,6 +360,14 @@
     var valid = lastParse.filter(function (r) { return r.ok; });
     if (!valid.length) return;
     var s = sess();
+    var newItems = [];
+    valid.forEach(function (r) { r.items.forEach(function (it) { newItems.push(it); }); });
+    var badC = closedViolation(pid, newItems, null);
+    if (badC) {
+      $('entryStatus').textContent = '\u1015\u102d\u1010\u103a\u1002\u100f\u1014\u103a\u1038 ' + badC.n + ' \u2014 ' + person(pid).name +
+        ' limit ' + fmt(badC.cap) + ' \u1000\u103b\u1031\u102c\u103a \u1019\u101a\u103a (' + fmt(badC.tot) + ' \u1016\u103c\u1005\u103a \u1014\u1031)';
+      return;
+    }
     var batchNo = 1;
     sessRecords().forEach(function (r) {
       if (r.personId === pid && r.batchNo >= batchNo) batchNo = r.batchNo + 1;
@@ -605,6 +615,8 @@
     if (!recs.length) return closeLineMenu();
     var r = window.Parser3D.parseLine($('lmInput').value);
     if (!r.ok) { $('lmHint').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
+    var badL = closedViolation(recs[0].personId, r.items, menuLineId);
+    if (badL) { $('lmHint').textContent = '\u1015\u102d\u1010\u103a\u1002\u100f\u1014\u103a\u1038 ' + badL.n + ' limit ' + fmt(badL.cap) + ' \u1000\u103b\u1031\u102c\u103a \u1019\u101a\u103a'; return; }
     var first = recs[0];
     var idx = state.records.indexOf(first);
     state.records = state.records.filter(function (x) { return x.lineId !== menuLineId; });
@@ -620,6 +632,59 @@
     newRecs.forEach(function (rec, i) { state.records.splice(idx + i, 0, rec); });
     save(); render(); closeLineMenu();
   });
+
+  /* ---------- blocked numbers (Pho Oct 22) ---------- */
+  function blockedNums() { var s = sess(); if (!s.blocked) s.blocked = []; return s.blocked; }
+  function renderBlocked() {
+    var box = $('blockedList'); if (!box) return;
+    var list = blockedNums();
+    box.innerHTML = list.length
+      ? '<div class="bchips">' + list.map(function (n) {
+          return '<span class="bchip" data-unblock="' + n + '">' + n + ' \u00d7</span>';
+        }).join('') + '</div>'
+      : '<div class="empty">\u1015\u102d\u1010\u103a \u1002\u100f\u1014\u103a\u1038 \u1019\u101b\u103e\u102d</div>';
+    box.querySelectorAll('[data-unblock]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var n = el.getAttribute('data-unblock');
+        sess().blocked = blockedNums().filter(function (x) { return x !== n; });
+        save(); renderBlocked();
+      });
+    });
+  }
+  on('blockedAdd', 'click', function () {
+    var v = normNum($('blockedInput').value);
+    var found = v.match(/\d{3}/g) || [];
+    var list = blockedNums(), added = 0;
+    found.forEach(function (n) { if (list.indexOf(n) < 0) { list.push(n); added++; } });
+    $('blockedInput').value = '';
+    $('blockedStatus').textContent = added ? added + ' \u101c\u102f\u1036\u1038 \u1011\u100a\u1037\u103a\u1015\u103c\u102e\u1038' : '\u1002\u100f\u1014\u103a\u1038 \u1043 \u101c\u102f\u1036\u1038 \u1011\u100a\u1037\u103a\u1015\u102b';
+    save(); renderBlocked();
+  });
+  // Per-person closed-number cap: ONLY for numbers on the Home closed
+  // list, ONLY when the person has a limit set (blank = no limit).
+  function closedViolation(pid, items, excludeLineId) {
+    var p = person(pid);
+    if (!p || p.closedLimit == null) return null;
+    var list = sess().blocked || [];
+    if (!list.length) return null;
+    var sums = {};
+    (items || []).forEach(function (it) {
+      if (list.indexOf(it.number) >= 0) sums[it.number] = (sums[it.number] || 0) + it.amount;
+    });
+    if (!Object.keys(sums).length) return null;
+    var existing = {};
+    sessRecords().forEach(function (r) {
+      if (r.personId !== pid) return;
+      if (excludeLineId && r.lineId === excludeLineId) return;
+      if (list.indexOf(r.number) >= 0) existing[r.number] = (existing[r.number] || 0) + r.amount;
+    });
+    var bad = null;
+    Object.keys(sums).forEach(function (n) {
+      var tot = (existing[n] || 0) + sums[n];
+      if (tot > p.closedLimit && !bad) bad = { n: n, cap: p.closedLimit, tot: tot };
+    });
+    return bad;
+  }
 
   /* ---------- over-limit ---------- */
   var overLines = '';
@@ -672,6 +737,7 @@
     renderDaily();
     renderVoucher();
     renderOver();
+    renderBlocked();
     parseBoard();
   }
   go('home');
