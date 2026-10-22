@@ -276,7 +276,7 @@
   }
 
 
-  var api = { parseLine: parseLine };
+  var api = { parseLine: parseLine, perms3: perms3 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.Parser3D = api;
 })(typeof window !== 'undefined' ? window : globalThis);
