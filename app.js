@@ -166,6 +166,13 @@
       });
     });
   }
+  // Pho Oct 22: numbers only - the dash inserts itself after the
+  // 3-digit payout ("55010" -> "550-10"). His keyboard has no '/'.
+  $('pPayout').addEventListener('input', function () {
+    var d = normNum($('pPayout').value).replace(/\D/g, '');
+    $('pPayout').value = d.length >= 3 ? d.slice(0, 3) + '-' + d.slice(3) : d;
+  });
+
   $('addPersonBtn').addEventListener('click', function () {
     var name = $('pName').value.trim();
     // One field carries both rates: payout/tote, e.g. "550/10" (Pho Oct 22).
