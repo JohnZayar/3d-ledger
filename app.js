@@ -155,7 +155,7 @@
     // list
     $('peopleList').innerHTML = state.people.map(function (p) {
       return '<div class="prow">' + (p.role === 'akan' ? '<span class="tag">အကန်</span>' : '') + '<span class="nm">' + esc(p.name) + '</span>' +
-        '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '/' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' +
+        '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '-' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' +
         '<button class="del" data-del="' + p.id + '">ဖျက်</button></div>';
     }).join('');
     document.querySelectorAll('[data-del]').forEach(function (b) {
@@ -169,7 +169,7 @@
   $('addPersonBtn').addEventListener('click', function () {
     var name = $('pName').value.trim();
     // One field carries both rates: payout/tote, e.g. "550/10" (Pho Oct 22).
-    var pr = normNum($('pPayout').value).split('/');
+    var pr = normNum($('pPayout').value).split(/[\/-]/); // Pho's keyboard has no '/', so '-' works too
     var payout = Number(pr[0]);
     var tote = pr.length > 1 ? Number(pr[1]) : 0;
     var comm = Number(normNum($('pComm').value));
