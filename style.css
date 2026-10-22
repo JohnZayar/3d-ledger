@@ -101,3 +101,7 @@ table.vt td.amt { text-align: right; font-weight: 700; width: 34%; }
 table.vt tr.vline { cursor: pointer; }
 table.vt td.xpand { text-align: left; background: #1d1e23; padding: 8px 9px; }
 .xgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 10px; font-size: 13px; color: #cfcfcf; }
+
+.tag { border: 1px solid #7a3a3a; color: #e08a8a; border-radius: 6px; padding: 1px 7px; font-size: 12px; font-weight: 700; }
+table.grid.akan th { background: #3a2323; }
+.akanhead { font-size: 14.5px; font-weight: 700; margin: 14px 0 7px; color: #e08a8a; }

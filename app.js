@@ -132,7 +132,7 @@
   function renderPeople() {
     // entry + voucher dropdowns
     var opts = state.people.map(function (p) {
-      return '<option value="' + p.id + '">' + esc(p.name) + '</option>';
+      return '<option value="' + p.id + '">' + esc(p.name) + (p.role === 'akan' ? ' (အကန်)' : '') + '</option>';
     }).join('');
     var ep = $('entryPerson'), vp = $('voucherPerson');
     var keepE = ep.value, keepV = vp.value;
@@ -142,7 +142,7 @@
     if (keepV && person(keepV)) vp.value = keepV;
     // list
     $('peopleList').innerHTML = state.people.map(function (p) {
-      return '<div class="prow"><span class="nm">' + esc(p.name) + '</span>' +
+      return '<div class="prow">' + (p.role === 'akan' ? '<span class="tag">အကန်</span>' : '') + '<span class="nm">' + esc(p.name) + '</span>' +
         '<span>အဆ ' + esc(fmt(p.payout)) + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' +
         '<button class="del" data-del="' + p.id + '">ဖျက်</button></div>';
     }).join('');
@@ -162,7 +162,7 @@
       $('peopleStatus').textContent = 'အမည် / အဆ / ကော် အကုန် ဖြည့်ပါ';
       return;
     }
-    state.people.push({ id: uid(), name: name, payout: payout, commission: comm });
+    state.people.push({ id: uid(), name: name, payout: payout, commission: comm, role: $('pRole').value });
     $('pName').value = ''; $('pPayout').value = ''; $('pComm').value = '';
     $('peopleStatus').textContent = '';
     save(); render();
@@ -314,6 +314,7 @@
     });
     var rows = '', T = { bet: 0, win: 0, pay: 0, net: 0 };
     state.people.forEach(function (p) {
+      if (p.role === 'akan') return;
       var d = byPerson[p.id];
       if (!d) return;
       var pay = d.win * p.payout;
@@ -322,11 +323,30 @@
       rows += '<tr><td>' + esc(p.name) + '</td><td>' + fmt(d.bet) + '</td><td>' + fmt(d.win) +
         '</td><td class="' + (net < 0 ? 'neg' : '') + '">' + fmt(net) + '</td></tr>';
     });
-    $('dailyBox').innerHTML =
+    var html =
       '<table class="grid"><tr><th>အမည်</th><th>တက်ငွေ</th><th>အပေါက်</th><th>ကျန်</th></tr>' +
       rows +
       '<tr class="tot"><td>စုစုပေါင်း</td><td>' + fmt(T.bet) + '</td><td>' + fmt(T.win) +
       '</td><td class="' + (T.net < 0 ? 'neg' : '') + '">' + fmt(T.net) + '</td></tr></table>';
+    // akan (hedge bookies): ကျန် = bet − commission + win × payout (bookie pays Pho)
+    var arows = '', A = { bet: 0, win: 0, net: 0 };
+    state.people.forEach(function (p) {
+      if (p.role !== 'akan') return;
+      var d = byPerson[p.id];
+      if (!d) return;
+      var net = d.bet * (1 - p.commission / 100) + d.win * p.payout;
+      A.bet += d.bet; A.win += d.win; A.net += net;
+      arows += '<tr><td>' + esc(p.name) + '</td><td>' + fmt(d.bet) + '</td><td>' + fmt(d.win) +
+        '</td><td>' + fmt(net) + '</td></tr>';
+    });
+    if (arows) {
+      html += '<div class="akanhead">အကန်ဒိုင် (ဒိုင် ပေးရန်)</div>' +
+        '<table class="grid akan"><tr><th>အမည်</th><th>တက်ငွေ</th><th>အပေါက်</th><th>ကျန်</th></tr>' +
+        arows +
+        '<tr class="tot"><td>စုစုပေါင်း</td><td>' + fmt(A.bet) + '</td><td>' + fmt(A.win) +
+        '</td><td>' + fmt(A.net) + '</td></tr></table>';
+    }
+    $('dailyBox').innerHTML = html;
   }
 
   /* ---------- vouchers ---------- */
