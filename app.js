@@ -266,10 +266,15 @@
         });
       });
     });
-    $('board').value = '';
+    // Pho Oct 22: only the saved (green) lines leave the board —
+    // invalid (red) lines STAY so they can be fixed and resubmitted.
+    var leftover = lastParse.filter(function (r) { return !r.ok && r.formula; })
+      .map(function (r) { return r.formula; }).join('\n');
+    $('board').value = leftover;
     parseBoard();
     save(); render();
-    $('entryStatus').textContent = 'NO ' + batchNo + ' သိမ်းပြီး';
+    $('entryStatus').textContent = 'NO ' + batchNo + ' သိမ်းပြီး' +
+      (leftover ? ' — နီ တဲ့ လိုင်း ကျန် နေ တယ်' : '');
   });
 
   /* ---------- ledger ---------- */
