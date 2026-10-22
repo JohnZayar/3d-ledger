@@ -42,9 +42,14 @@
 
   function finish(numbers, amount, formula, kind) {
     var items = numbers.map(function (n) { return { number: n, amount: amount }; });
+    return finishItems(items, formula, kind);
+  }
+
+  function finishItems(items, formula, kind) {
+    var total = items.reduce(function (a, it) { return a + it.amount; }, 0);
     return {
       ok: true, items: items, formula: formula,
-      count: items.length, total: amount * items.length, kind: kind
+      count: items.length, total: total, kind: kind
     };
   }
 
@@ -111,6 +116,21 @@
       nums = [];
       for (i = 0; i <= 9; i++) nums.push(m[1] + m[2] + i);
       return finish(nums, amount, raw, 'series');
+    }
+
+    // ဒဲ့ + ကျန်/အာ split pricing (Pho Oct 22): 123ဒဲ့1000အာ500 —
+    // straight number at the ဒဲ့ amount, each REMAINING distinct
+    // permutation at the second amount (အာ and ကျန် equivalent here).
+    m = s.match(/^(\d)(\d)(\d)\s*ဒဲ့\s*\-?\s*(\d+)\s*(?:အာ|ကျန်)\s*\-?\s*(\d+)$/);
+    if (m) {
+      var dAmt = parseInt(m[4], 10), rAmt = parseInt(m[5], 10);
+      if (!(dAmt > 0) || !(rAmt > 0)) return invalid(raw);
+      var straight = m[1] + m[2] + m[3];
+      var items = [{ number: straight, amount: dAmt }];
+      perms3(m[1], m[2], m[3]).forEach(function (pn) {
+        if (pn !== straight) items.push({ number: pn, amount: rAmt });
+      });
+      return finishItems(items, raw, 'daekyan');
     }
 
     // Permutation: 123@500 — markers @ R r * အာ are equivalent

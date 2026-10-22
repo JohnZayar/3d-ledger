@@ -191,6 +191,11 @@
     var pv = $('preview');
     if (valid.length) {
       var html = valid.map(function (r) {
+        if (r.kind === 'daekyan') {
+          var rest = r.items.slice(1);
+          return '<div>' + esc(r.formula) + ' → ဒဲ့ ' + fmt(r.items[0].amount) +
+            (rest.length ? ' + ကျန် ' + rest.length + ' × ' + fmt(rest[0].amount) : '') + '</div>';
+        }
         return '<div>' + esc(r.formula) + ' → ' + r.count + ' ကွက် × ' + fmt(r.items[0].amount) + '</div>';
       }).join('');
       var tc = valid.reduce(function (a, r) { return a + r.count; }, 0);
