@@ -133,6 +133,49 @@
       return finishItems(items, raw, 'daekyan');
     }
 
+    // Number lists (Pho Oct 22): separators - , . ~ between 3-digit numbers.
+    // Split: list/single + =A + R + B -> listed at A each, remaining perms at B each.
+    m = s.match(/^(\d{3}(?:\s*[-~,.]\s*\d{3})*)\s*=\s*(\d+)\s*(?:R|r|အာ)\s*(\d+)$/);
+    if (m) {
+      var subs = m[1].split(/\s*[-~,.]\s*/);
+      var sAmt = parseInt(m[2], 10), oAmt = parseInt(m[3], 10);
+      if (!(sAmt > 0) || !(oAmt > 0)) return invalid(raw);
+      var seenS = {}, items = [];
+      subs.forEach(function (n) {
+        if (!seenS[n]) { seenS[n] = 1; items.push({ number: n, amount: sAmt }); }
+      });
+      subs.forEach(function (n) {
+        perms3(n[0], n[1], n[2]).forEach(function (pn) {
+          if (!seenS[pn]) { seenS[pn] = 1; items.push({ number: pn, amount: oAmt }); }
+        });
+      });
+      var r = finishItems(items, raw, 'split');
+      r.head = subs.length;
+      return r;
+    }
+
+    // List, one price: list + =A -> each listed number at A.
+    m = s.match(/^(\d{3}(?:\s*[-~,.]\s*\d{3})+)\s*=\s*(\d+)$/);
+    if (m) {
+      amount = parseInt(m[2], 10);
+      if (!(amount > 0)) return invalid(raw);
+      return finish(m[1].split(/\s*[-~,.]\s*/), amount, raw, 'list');
+    }
+
+    // List permutations: list + marker + A -> union of perms of each, at A.
+    m = s.match(/^(\d{3}(?:\s*[-~,.]\s*\d{3})+)\s*(?:@|R|r|\*|အာ)\s*(\d+)$/);
+    if (m) {
+      amount = parseInt(m[2], 10);
+      if (!(amount > 0)) return invalid(raw);
+      var seenP = {}, all = [];
+      m[1].split(/\s*[-~,.]\s*/).forEach(function (n) {
+        perms3(n[0], n[1], n[2]).forEach(function (pn) {
+          if (!seenP[pn]) { seenP[pn] = 1; all.push(pn); }
+        });
+      });
+      return finish(all, amount, raw, 'listperm');
+    }
+
     // Permutation: 123@500 — markers @ R r * အာ are equivalent
     m = s.match(/^(\d)(\d)(\d)\s*(?:@|R|r|\*|အာ)\s*[=\-]?\s*(\d+)$/);
     if (m) {

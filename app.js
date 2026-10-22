@@ -191,6 +191,12 @@
     var pv = $('preview');
     if (valid.length) {
       var html = valid.map(function (r) {
+        if (r.kind === 'split') {
+          var head = r.head || 1;
+          var sIt = r.items.slice(0, head), rIt = r.items.slice(head);
+          return '<div>' + esc(r.formula) + ' → ' + head + ' လုံး × ' + fmt(sIt[0].amount) +
+            (rIt.length ? ' + ကျန် ' + rIt.length + ' × ' + fmt(rIt[0].amount) : '') + '</div>';
+        }
         if (r.kind === 'daekyan') {
           var rest = r.items.slice(1);
           return '<div>' + esc(r.formula) + ' → ဒဲ့ ' + fmt(r.items[0].amount) +
