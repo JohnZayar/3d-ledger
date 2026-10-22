@@ -94,7 +94,8 @@ textarea.ta.board { min-height: 44vh; font-size: 16.5px; line-height: 1.9; }
 .boardbar { display: flex; justify-content: space-between; padding: 8px 2px 0; font-size: 13.5px; color: #9a9a9a; }
 .boardbar b { color: #ececec; }
 .btnrow { display: flex; gap: 8px; margin-top: 10px; }
-.btnrow .btn { margin-top: 0; flex: 1; }
+.btnrow .btn { margin-top: 0; flex: 1 1 0; width: auto; padding: 11px 4px; font-size: 15px; white-space: nowrap; }
+.btnrow .btn.gray { flex: 1 1 0; }
 .btn.gray { background: #232429; color: #ececec; border: 1px solid #3a3b41; flex: 0 0 110px; }
 /* voucher line table */
 table.vt td.amt { text-align: right; font-weight: 700; width: 34%; }
