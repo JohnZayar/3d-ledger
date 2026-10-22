@@ -385,10 +385,13 @@
       el.addEventListener('click', function () { hundred = Number(el.getAttribute('data-h')); renderLedger(); });
     });
     var totals = totalsByNumber();
-    var tSum = 0, tCnt = 0;
-    Object.keys(totals).forEach(function (k) { if (totals[k] > 0) { tSum += totals[k]; tCnt++; } });
+    var tSum = 0;
+    Object.keys(totals).forEach(function (k) { if (totals[k] > 0) tSum += totals[k]; });
     $('ledTotal').textContent = fmt(tSum);
-    $('ledCount').textContent = fmt(tCnt);
+    // Trade custom (Pho Oct 22): the count is an exposure gauge, NOT a
+    // number/line count - akwets = All Total / Limit (floor).
+    // 700,600 / 19,000 = 36 akwets; 100,000 / 5,000 = 20.
+    $('ledCount').textContent = fmt(s.limit > 0 ? Math.floor(tSum / s.limit) : 0);
     var html = '';
     for (var i = 0; i < 100; i++) {
       var num = String(hundred * 100 + i).padStart(3, '0');
