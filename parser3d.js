@@ -196,7 +196,7 @@
         else { for (k = 0; k < 10; k++) res.push(digs[0] + String(k) + digs[1]); }
         return { nums: res, len: mm[0].length, bareOk: true };
       }
-      mm = str.match(/^\d{3}/);
+      mm = str.match(/^\d{3}(?!\d)/);
       if (mm) return { nums: [mm[0]], len: 3 };
       return null;
     }
@@ -212,9 +212,16 @@
       if (pos >= s.length) { rest = ''; break; }
       var ch = s[pos];
       if (ch === '-' || ch === '~' || ch === ',' || ch === '.' || ch === '*') {
-        lastSep = ch; pos++;
+        lastSep = ch;
+        var runStart = pos;
+        while (pos < s.length && '-~,. *'.indexOf(s[pos]) >= 0 && s[pos] !== ' ') pos++;
+        var runLen = pos - runStart;
         while (pos < s.length && s[pos] === ' ') pos++;
         if (pos >= s.length) return invalid(raw);
+        // Pho's writing (Oct 23): an ellipsis-style run ("...") before
+        // the price means the rest is the TAIL, not more members:
+        // 123.235.345.567...5000 = the four numbers at 5000 each.
+        if (runLen >= 2) { rest = s.slice(pos); break; }
         continue;
       }
       rest = s.slice(savePos);
@@ -236,6 +243,13 @@
     }
 
     var tm;
+    // Bare amount tail after an ellipsis run: 123.567...5000.
+    tm = rest.match(/^(\d+)$/);
+    if (tm) {
+      var bAmt = parseInt(tm[1], 10);
+      if (!(bAmt > 0)) return invalid(raw);
+      return finish(S, bAmt, raw, (members.length === 1 && members[0].nums.length === 1) ? 'single' : 'list');
+    }
     // Split tail: = A (R|r|ar) B
     tm = rest.match(/^\s*=\s*(\d+)\s*(?:ကျန်အာ|ကျန်|R|r|အာ|@)\s*(\d+)$/);
     if (tm) {
