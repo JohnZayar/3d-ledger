@@ -70,6 +70,7 @@ table.grid th { background: #2b2c31; font-weight: 700; }
 table.grid td:first-child, table.grid th:first-child { text-align: left; }
 table.grid tr.tot td { font-weight: 800; background: #2b2c31; }
 .neg { color: #e08a8a; }
+.pos { color: #7bc47f; font-weight: 700; }
 .empty { background: #232429; border: 1px solid #3a3b41; border-radius: 10px; padding: 16px; text-align: center; color: #9a9a9a; font-size: 14px; }
 
 /* vouchers */
