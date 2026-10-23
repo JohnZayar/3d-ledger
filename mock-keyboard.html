@@ -21,6 +21,9 @@
   #board { margin-top: 10px; width: 100%; flex: 1; min-height: 90px; background: #101114; border: 1px solid #57492a; border-radius: 12px; color: #ececec; padding: 12px; font-size: 17px; line-height: 1.65; resize: none; }
   .vbox { margin-top: 8px; background: #101114; border: 1px solid #3a3b41; border-radius: 10px; padding: 8px 11px; font-size: 13px; color: #9a9aa2; }
   .vbox b { color: #7bc47f; }
+  .kbbar { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .kbbar span { background: #232429; border: 1px solid #57492a; color: #e8c84a; border-radius: 999px; padding: 7px 16px; font-size: 13.5px; font-weight: 700; cursor: pointer; user-select: none; }
+  .kbbar span.on { background: linear-gradient(150deg,#ecc95a,#c39b27); color: #17181c; }
   /* ---------- keyboard ---------- */
   .kb { background: #101013; border-top: 1px solid #3a3325; padding: 8px 7px 12px; }
   .krow { display: flex; gap: 6px; margin-bottom: 6px; }
@@ -36,21 +39,21 @@
 </style>
 </head>
 <body>
-  <div class="cap"><b>အမြန်ထိုး Keyboard — အကြမ်း</b><br>အောက် က key တွေ ကို တကယ် နှိပ် ကြည့် လို့ ရ တယ် — board ထဲ စာ ဝင် မယ်.</div>
+  <div class="cap"><b>အမြန်ထိုး Keyboard — အကြမ်း</b><br><b>⌨ Keyboard</b> ခလုပ် ကို နှိပ် ကြည့် — keyboard ပေါ် လာ မယ်, ပြန် နှိပ် ရင် ပျောက် မယ်. key တွေ လည်း တကယ် နှိပ် လို့ ရ တယ်.</div>
 
   <div class="phone">
     <div class="hdr"><span class="badge">3D</span><b>3D <span class="g">MASTER</span></b></div>
     <div class="body">
       <div class="who"><span>SS</span><span style="color:#9a9aa2">လူ ရွေး ▾</span></div>
       <div class="btnrow"><span>Paste</span><span>စကန်</span><span>အကျွံ</span><span class="save">သိမ်းမည်</span></div>
-      <textarea id="board" readonly inputmode="none" placeholder="ဒီမှာ ရိုက်ထည့်ပါ…">123=1500/500</textarea>
+      <div class="kbbar"><span id="kbToggle">⌨ Keyboard</span></div>
+      <textarea id="board" placeholder="ဒီမှာ ရိုက်ထည့်ပါ…">123=1500/500</textarea>
       <div class="vbox"><b>✅</b> စစ် ပြီး သား စာကြောင်း တွေ ဒီ မှာ ပြ မယ်</div>
     </div>
-    <div class="kb" id="kb">
+    <div class="kb" id="kb" style="display:none">
       <div class="krow">
         <div class="k fn" data-t="ဒဲ့">ဒဲ့</div>
         <div class="k fn" data-t="ကျန်">ကျန်</div>
-        <div class="k fn" data-t="အာ">အာ</div>
         <div class="k fn" data-t="R">R</div>
         <div class="k fn" data-t="ထွိုင်">ထွိုင်</div>
       </div>
@@ -67,26 +70,30 @@
         <div class="k sym" data-t="/">/</div>
       </div>
       <div class="krow">
-        <div class="k sym" data-t=",">,</div><div class="k" data-t="0">0</div><div class="k sym" data-t=".">.</div>
-        <div class="k sym" data-t="-">-</div>
+        <div class="k sym" data-t="-">-</div><div class="k" data-t="0">0</div>
+        <div class="k sym" data-t="⏎">⏎</div>
       </div>
       <div class="krow">
-        <div class="k sym" data-t="~">~</div>
-        <div class="k wide" data-t=" ">space</div>
-        <div class="k sym" data-t="⏎">⏎</div>
+        <div class="k" data-t=" ">space</div>
       </div>
     </div>
   </div>
 
   <div class="note">
-    • <b>Shortcut key</b> တွေ: ဒဲ့ / ကျန် / အာ / R / ထွိုင် — နှိပ် လိုက် ရင် စာသား တစ်ခါ တည်း ဝင်<br>
-    • board ကို နှိပ် ရင် <b>phone keyboard မ တက်</b> — ဒီ keyboard က အောက် မှာ အမြဲ နေ မယ်<br>
+    • <b>Shortcut key</b> တွေ: ဒဲ့ / ကျန် / R / ထွိုင် — နှိပ် လိုက် ရင် စာသား တစ်ခါ တည်း ဝင်<br>
+    • <b>⌨ ခလုပ်</b>: နှိပ် ရင် ပေါ်, ပြန် နှိပ် ရင် ပျောက် — လို မှ ခေါ် သုံး, ပိတ် ထား ရင် phone keyboard ပုံ မှန် သုံး လို့ ရ<br>
     • Viber က စာ ကို <b>Paste</b> နဲ့ ဆက် သုံး လို့ ရ တယ်<br>
     • ဒါ အကြမ်း — ကြိုက် မှ အစစ် app ထဲ ထည့် မယ်. key နေရာ/အရွယ် ပြင် ချင် တာ ရှိ ရင် ပြော
   </div>
 
 <script>
   var board = document.getElementById('board');
+  var kb = document.getElementById('kb'), tg = document.getElementById('kbToggle');
+  tg.addEventListener('click', function () {
+    var open = kb.style.display !== 'none';
+    kb.style.display = open ? 'none' : 'block';
+    tg.classList.toggle('on', !open);
+  });
   document.getElementById('kb').addEventListener('click', function (e) {
     var k = e.target.closest('.k'); if (!k) return;
     var t = k.getAttribute('data-t');
