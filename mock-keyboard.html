@@ -30,9 +30,6 @@
   .whoR { display: flex; align-items: center; gap: 9px; }
   .kbt { border: 1px solid #57492a; color: #e8c84a; border-radius: 9px; padding: 4px 11px; font-size: 15px; font-weight: 700; cursor: pointer; user-select: none; }
   .kbt.on { background: linear-gradient(150deg,#ecc95a,#c39b27); color: #17181c; }
-  .curbar { background: #0c0c0e; border: 1px solid #57492a; border-radius: 10px; padding: 8px 11px; margin-bottom: 7px; font-size: 16.5px; white-space: nowrap; overflow: hidden; color: #ececec; }
-  .curbar .cur { background: #e8c84a; color: #17181c; border-radius: 3px; padding: 0 1px; font-weight: 900; animation: blink 1.05s steps(1) infinite; }
-  @keyframes blink { 50% { background: #7a6414; } }
   /* ---------- keyboard ---------- */
   .kb { background: #101013; border-top: 1px solid #3a3325; padding: 8px 7px 12px; }
   .krow { display: flex; gap: 6px; margin-bottom: 6px; }
@@ -59,7 +56,6 @@
       <div class="btnrow"><span>Paste</span><span>စကန်</span><span>အကျွံ</span><span class="save">သိမ်းမည်</span></div>
     </div>
     <div class="kb" id="kb" style="display:none">
-      <div class="curbar" id="curbar">cursor ဒီ မှာ ပြ မယ်</div>
       <div class="krow">
         <div class="k fn" data-t="ဒဲ့">ဒဲ့</div>
         <div class="k fn" data-t="ကျန်">ကျန်</div>
@@ -83,9 +79,7 @@
         <div class="k sym" data-t="⏎">⏎</div>
       </div>
       <div class="krow">
-        <div class="k sym" data-t="◀">◀</div>
-        <div class="k wide" data-t=" ">space</div>
-        <div class="k sym" data-t="▶">▶</div>
+        <div class="k" data-t=" ">space</div>
       </div>
     </div>
   </div>
@@ -93,7 +87,7 @@
   <div class="note">
     • <b>Shortcut key</b> တွေ (keyboard အပေါ် ဆုံး တန်း): ဒဲ့ / ကျန် / R / ထွိုင် — နှိပ် လိုက် ရင် စာသား တစ်ခါ တည်း ဝင်<br>
     • <b>⌨ ခလုတ် အသေး</b> ကို လူ ရွေး တန်း ထဲ ထည့် ထား တယ်, Paste/စကန်/အကျွံ/သိမ်း တန်း ကို board <b>အောက်</b> ချ ထား တယ် — board နေရာ ကျယ် ကျယ် ရ အောင်<br>
-    • <b>ကြား က ပြင် ချင် ရင်</b>: ပြင် ချင် တဲ့ နေရာ ကို board ထဲ <b>ထောက်</b> (phone keyboard မ တက်) — keyboard အပေါ် က <b>cursor တန်း</b> မှာ ရွှေ block နဲ့ နေရာ အတိ အကျ ပြ မယ်. <b>◀ ▶</b> နဲ့ လည်း ရွှေ့ လို့ ရ. ရိုက် ရင် အဲ့ နေရာ မှာ ဝင်, ⌫ က ရှေ့ ကို ဖျက်<br>
+    • <b>ကြား က ပြင် ချင် ရင်</b>: ပြင် ချင် တဲ့ နေရာ ကို board ထဲ <b>ထောက်</b> — cursor ကျ မယ် (phone keyboard မ တက်). ရိုက် ရင် cursor နေရာ မှာ ဝင်, ⌫ က cursor ရှေ့ ကို ဖျက်<br>
     • ဒီ keyboard နဲ့ ရိုက် လည်း <b>စစ်ဘုတ် က အမြဲ စစ်</b> တယ် — phone keyboard ပြန် ခေါ် စ ရာ မ လို<br>
     • <b>⌨ ခလုပ်</b>: နှိပ် ရင် ပေါ်, ပြန် နှိပ် ရင် ပျောက် — လို မှ ခေါ် သုံး. board နှိပ် ရင် <b>phone keyboard လုံးဝ မ တက်</b> (ဒီ keyboard နဲ့ ပဲ ရိုက် ရ မယ်)<br>
     • Viber က စာ ကို <b>Paste</b> နဲ့ ဆက် သုံး လို့ ရ တယ်<br>
@@ -128,31 +122,15 @@
     var open = kb.style.display !== 'none';
     kb.style.display = open ? 'none' : 'block';
     tg.classList.toggle('on', !open);
-    if (!open) { board.focus(); drawCursor(); }
+    if (!open) { board.focus(); }
   });
   function setCaret(pos) { try { board.setSelectionRange(pos, pos); } catch (e) {} }
-  var curbar = document.getElementById('curbar');
-  function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
-  function drawCursor() {
-    var v = board.value, s = board.selectionStart == null ? v.length : board.selectionStart;
-    var ls = v.lastIndexOf('\n', s - 1) + 1, le = v.indexOf('\n', s); if (le < 0) le = v.length;
-    var line = v.slice(ls, le), col = s - ls;
-    var from = Math.max(0, col - 16), to = Math.min(line.length, col + 17);
-    var before = (from > 0 ? '…' : '') + line.slice(from, col);
-    var at = col < line.length ? line[col] : ' ';
-    var after = line.slice(col + 1, to) + (to < line.length ? '…' : '');
-    curbar.innerHTML = escHtml(before) + '<span class="cur">' + escHtml(at) + '</span>' + escHtml(after);
-  }
-  board.addEventListener('click', drawCursor);
-  document.addEventListener('selectionchange', function () { if (document.activeElement === board) drawCursor(); });
-  document.getElementById('kb').addEventListener('click', function (e) {
+    document.getElementById('kb').addEventListener('click', function (e) {
     var k = e.target.closest('.k'); if (!k) return;
     var t = k.getAttribute('data-t');
     var s = board.selectionStart == null ? board.value.length : board.selectionStart;
     var en = board.selectionEnd == null ? s : board.selectionEnd;
     board.focus();
-    if (t === '◀') { setCaret(Math.max(0, s - 1)); return; }
-    if (t === '▶') { setCaret(Math.min(board.value.length, en + 1)); return; }
     if (t === '⌫') {
       if (en > s) { board.value = board.value.slice(0, s) + board.value.slice(en); setCaret(s); }
       else if (s > 0) { board.value = board.value.slice(0, s - 1) + board.value.slice(s); setCaret(s - 1); }
@@ -162,7 +140,7 @@
       setCaret(s + ins.length);
     }
     board.scrollTop = board.scrollHeight;
-    validate(); drawCursor();
+    validate();
   });
   validate();
 </script>
