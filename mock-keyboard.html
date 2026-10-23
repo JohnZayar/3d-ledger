@@ -51,7 +51,7 @@
     <div class="hdr"><span class="badge">3D</span><b>3D <span class="g">MASTER</span></b></div>
     <div class="body">
       <div class="who"><span>SS</span><span class="whoR"><span style="color:#9a9aa2">လူ ရွေး ▾</span><span id="kbToggle" class="kbt">⌨</span></span></div>
-      <textarea id="board" readonly inputmode="none" placeholder="⌨ Keyboard ဖွင့် ပြီး ရိုက်ပါ…">123=1500/500</textarea>
+      <textarea id="board" inputmode="none" placeholder="⌨ Keyboard ဖွင့် ပြီး ရိုက်ပါ…">123=1500/500</textarea>
       <div class="vbox" id="vbox">စာကြောင်း ရိုက် ရင် ဒီ မှာ ချက် ချင်း စစ် ပြ မယ်</div>
       <div class="btnrow"><span>Paste</span><span>စကန်</span><span>အကျွံ</span><span class="save">သိမ်းမည်</span></div>
     </div>
@@ -79,7 +79,9 @@
         <div class="k sym" data-t="⏎">⏎</div>
       </div>
       <div class="krow">
-        <div class="k" data-t=" ">space</div>
+        <div class="k sym" data-t="◀">◀</div>
+        <div class="k wide" data-t=" ">space</div>
+        <div class="k sym" data-t="▶">▶</div>
       </div>
     </div>
   </div>
@@ -87,6 +89,7 @@
   <div class="note">
     • <b>Shortcut key</b> တွေ (keyboard အပေါ် ဆုံး တန်း): ဒဲ့ / ကျန် / R / ထွိုင် — နှိပ် လိုက် ရင် စာသား တစ်ခါ တည်း ဝင်<br>
     • <b>⌨ ခလုတ် အသေး</b> ကို လူ ရွေး တန်း ထဲ ထည့် ထား တယ်, Paste/စကန်/အကျွံ/သိမ်း တန်း ကို board <b>အောက်</b> ချ ထား တယ် — board နေရာ ကျယ် ကျယ် ရ အောင်<br>
+    • <b>ကြား က ပြင် ချင် ရင်</b>: ပြင် ချင် တဲ့ နေရာ ကို board ထဲ <b>ထောက်</b> (cursor ကျ မယ်, phone keyboard မ တက်) — ဒါမှ မဟုတ် <b>◀ ▶</b> နဲ့ ရွှေ့. ရိုက် ရင် cursor နေရာ မှာ ဝင်, ⌫ က cursor ရှေ့ ကို ဖျက်<br>
     • ဒီ keyboard နဲ့ ရိုက် လည်း <b>စစ်ဘုတ် က အမြဲ စစ်</b> တယ် — phone keyboard ပြန် ခေါ် စ ရာ မ လို<br>
     • <b>⌨ ခလုပ်</b>: နှိပ် ရင် ပေါ်, ပြန် နှိပ် ရင် ပျောက် — လို မှ ခေါ် သုံး. board နှိပ် ရင် <b>phone keyboard လုံးဝ မ တက်</b> (ဒီ keyboard နဲ့ ပဲ ရိုက် ရ မယ်)<br>
     • Viber က စာ ကို <b>Paste</b> နဲ့ ဆက် သုံး လို့ ရ တယ်<br>
@@ -116,19 +119,29 @@
     vbox.innerHTML = html;
   }
   board.addEventListener('input', validate);
-  board.addEventListener('focus', function () { board.blur(); });
   var kb = document.getElementById('kb'), tg = document.getElementById('kbToggle');
   tg.addEventListener('click', function () {
     var open = kb.style.display !== 'none';
     kb.style.display = open ? 'none' : 'block';
     tg.classList.toggle('on', !open);
   });
+  function setCaret(pos) { try { board.setSelectionRange(pos, pos); } catch (e) {} }
   document.getElementById('kb').addEventListener('click', function (e) {
     var k = e.target.closest('.k'); if (!k) return;
     var t = k.getAttribute('data-t');
-    if (t === '⌫') board.value = board.value.slice(0, -1);
-    else if (t === '⏎') board.value += '\n';
-    else board.value += t;
+    var s = board.selectionStart == null ? board.value.length : board.selectionStart;
+    var en = board.selectionEnd == null ? s : board.selectionEnd;
+    board.focus();
+    if (t === '◀') { setCaret(Math.max(0, s - 1)); return; }
+    if (t === '▶') { setCaret(Math.min(board.value.length, en + 1)); return; }
+    if (t === '⌫') {
+      if (en > s) { board.value = board.value.slice(0, s) + board.value.slice(en); setCaret(s); }
+      else if (s > 0) { board.value = board.value.slice(0, s - 1) + board.value.slice(s); setCaret(s - 1); }
+    } else {
+      var ins = t === '⏎' ? '\n' : t;
+      board.value = board.value.slice(0, s) + ins + board.value.slice(en);
+      setCaret(s + ins.length);
+    }
     board.scrollTop = board.scrollHeight;
     validate();
   });
