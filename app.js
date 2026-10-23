@@ -474,44 +474,28 @@
       if (s.winning && r.number === s.winning) byPerson[r.personId].win += r.amount;
       else if (tset && tset[r.number]) byPerson[r.personId].tote += r.amount;
     });
-    var rows = '', T = { bet: 0, win: 0, tote: 0, pay: 0, net: 0 };
+    var rows = '', T = { bet: 0, win: 0, tote: 0, net: 0 };
     state.people.forEach(function (p) {
-      if (p.role === 'akan') return;
       var d = byPerson[p.id];
       if (!d) return;
       var pay = d.win * p.payout + d.tote * (p.tote || 0);
-      var net = d.bet * (1 - p.commission / 100) - pay;
-      T.bet += d.bet; T.win += d.win; T.tote += d.tote; T.pay += pay; T.net += net;
-      rows += '<tr><td>' + esc(p.name) + '</td><td>' + fmt(d.bet) + '</td><td>' + fmt(d.win) +
+      // bettors PLUS / akan MINUS (Pho hand-verified Oct 23: NN 104,100 @25% + tote 6,000x10 = -18,075)
+      var net = p.role === 'akan'
+        ? -d.bet * (1 - p.commission / 100) + pay
+        : d.bet * (1 - p.commission / 100) - pay;
+      T.bet += d.bet; T.win += d.win; T.tote += d.tote; T.net += net;
+      var nc = net < 0 ? 'neg' : (net > 0 ? 'pos' : '');
+      rows += '<tr><td>' + (p.role === 'akan' ? '<span class="tag">အကန်</span> ' : '') + esc(p.name) + '</td><td>' + fmt(d.bet) + '</td><td>' + fmt(d.win) +
         '</td><td>' + fmt(d.tote) +
-        '</td><td class="' + (net < 0 ? 'neg' : '') + '">' + fmt(net) + '</td></tr>';
+        '</td><td class="' + nc + '">' + fmt(net) + '</td></tr>';
     });
+    var tc = T.net < 0 ? 'neg' : (T.net > 0 ? 'pos' : '');
     var html =
       '<table class="grid"><tr><th>အမည်</th><th>တက်ငွေ</th><th>အပေါက်</th><th>တွဒ်</th><th>ကျန်</th></tr>' +
       rows +
       '<tr class="tot"><td>စုစုပေါင်း</td><td>' + fmt(T.bet) + '</td><td>' + fmt(T.win) +
       '</td><td>' + fmt(T.tote) +
-      '</td><td class="' + (T.net < 0 ? 'neg' : '') + '">' + fmt(T.net) + '</td></tr></table>';
-    // akan (hedge bookies): ကျန် = bet − commission + win × payout (bookie pays Pho)
-    var arows = '', A = { bet: 0, win: 0, tote: 0, net: 0 };
-    state.people.forEach(function (p) {
-      if (p.role !== 'akan') return;
-      var d = byPerson[p.id];
-      if (!d) return;
-      var net = d.bet * (1 - p.commission / 100) + d.win * p.payout + d.tote * (p.tote || 0);
-      A.bet += d.bet; A.win += d.win; A.tote += d.tote; A.net += net;
-      arows += '<tr><td>' + esc(p.name) + '</td><td>' + fmt(d.bet) + '</td><td>' + fmt(d.win) +
-        '</td><td>' + fmt(d.tote) +
-        '</td><td>' + fmt(net) + '</td></tr>';
-    });
-    if (arows) {
-      html += '<div class="akanhead">အကန်ဒိုင် (ဒိုင် ပေးရန်)</div>' +
-        '<table class="grid akan"><tr><th>အမည်</th><th>တက်ငွေ</th><th>အပေါက်</th><th>တွဒ်</th><th>ကျန်</th></tr>' +
-        arows +
-        '<tr class="tot"><td>စုစုပေါင်း</td><td>' + fmt(A.bet) + '</td><td>' + fmt(A.win) +
-        '</td><td>' + fmt(A.tote) +
-        '</td><td>' + fmt(A.net) + '</td></tr></table>';
-    }
+      '</td><td class="' + tc + '">' + fmt(T.net) + '</td></tr></table>';
     $('dailyBox').innerHTML = html;
   }
 
