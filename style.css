@@ -99,6 +99,19 @@ table.vt tr.vtot td { border-top: 2px dashed #55565e; font-weight: 800; text-ali
 
 /* board-first entry */
 textarea.ta.board { min-height: 44vh; font-size: 16.5px; line-height: 1.9; }
+.prow2 { display: flex; gap: 8px; align-items: stretch; }
+.prow2 select { flex: 1; min-width: 0; }
+.kbt { border: 1px solid #57492a; background: #232429; color: #e8c84a; border-radius: 10px; padding: 0 15px; font-size: 17px; font-weight: 700; cursor: pointer; }
+.kbt.on { background: linear-gradient(150deg, #ecc95a, #c39b27); color: #17181c; }
+textarea.ta.board { caret-color: #ffd94a; }
+.kb { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 560px; background: #101013; border-top: 1px solid #3a3325; padding: 8px 7px 12px; z-index: 15; box-shadow: 0 -8px 24px rgba(0,0,0,.5); }
+.krow { display: flex; gap: 6px; margin-bottom: 6px; }
+.krow:last-child { margin-bottom: 0; }
+.k { flex: 1; background: linear-gradient(180deg, #2b2b32, #222228); border: 1px solid #3d3a30; border-bottom-width: 2px; border-radius: 11px; color: #f2f2f2; font-size: 19px; font-weight: 700; padding: 11px 0; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.k:active { background: #c9a227; color: #17181c; }
+.k.fn { background: linear-gradient(180deg, #3a3220, #2a2517); border-color: #57492a; color: #e8c84a; font-size: 15.5px; }
+.k.sym { color: #e8c84a; }
+.k.wide { flex: 2.2; }
 .boardbar { display: flex; justify-content: space-between; padding: 8px 2px 0; font-size: 13.5px; color: #9a9a9a; }
 .boardbar b { color: #ececec; }
 .btnrow { display: flex; gap: 8px; margin-top: 10px; }
