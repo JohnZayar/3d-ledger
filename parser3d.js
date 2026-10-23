@@ -204,6 +204,16 @@
         else { for (k = 0; k < 10; k++) res.push(digs[0] + String(k) + digs[1]); }
         return { nums: res, len: mm[0].length, bareOk: true };
       }
+      // Positional covers (Pho, Oct 24): 4htate 500 / 7nauk500 / 3alel 600 -
+      // one digit fixed in its position, the other two run free (100 numbers).
+      mm = str.match(/^(\d)(ထိပ်|နောက်|အလယ်|အလည်)(?!စီးရီး)/);
+      if (mm) {
+        var d = mm[1], out2 = [], x, y;
+        if (mm[2] === 'ထိပ်') { for (x = 0; x < 100; x++) out2.push(d + (x < 10 ? '0' : '') + x); }
+        else if (mm[2] === 'နောက်') { for (x = 0; x < 100; x++) out2.push((x < 10 ? '0' : '') + x + d); }
+        else { for (x = 0; x < 10; x++) for (y = 0; y < 10; y++) out2.push(String(x) + d + String(y)); }
+        return { nums: out2, len: mm[0].length, bareOk: true };
+      }
       mm = str.match(/^\d{3}(?!\d)/);
       if (mm) return { nums: [mm[0]], len: 3 };
       return null;
