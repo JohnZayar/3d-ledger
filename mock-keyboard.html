@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>အမြန်ထိုး Keyboard အကြမ်း</title>
+<title>အမြန်ထိုး Keyboard အကြမ်း v5</title>
 <style>
   * { box-sizing: border-box; margin: 0; font-family: "Myanmar Text", "Noto Sans Myanmar", sans-serif; }
   body { background: #0c0c0e; color: #ececec; padding: 16px 10px 30px; }
@@ -42,18 +42,18 @@
 </style>
 </head>
 <body>
-  <div class="cap"><b>အမြန်ထိုး Keyboard — အကြမ်း</b><br><b>⌨ Keyboard</b> ခလုပ် နှိပ် ပြီး key တွေ နှိပ် ကြည့် — <b>စစ်ဘုတ် က key နှိပ် တိုင်း ချက် ချင်း ပြန် စစ်</b> မယ် (အစစ် parser နဲ့).</div>
+  <div class="cap"><b>အမြန်ထိုး Keyboard — v5 အကြမ်း</b><br>စာရိုက်ကွက် <b>လော့ခ်</b> ချ ထား တယ် — <b>ဖုန်း keyboard ပေါ် လာ စ ရာ မ လို</b> တော့ ဘူး, ဒီ <b>⌨ Keyboard</b> နဲ့ ပဲ ရိုက်. <b>စစ်ဘုတ် က key နှိပ် တိုင်း ချက် ချင်း ပြန် စစ်</b> မယ် (အစစ် parser နဲ့).</div>
 
   <div class="phone">
     <div class="hdr"><span class="badge">3D</span><b>3D <span class="g">MASTER</span></b></div>
     <div class="body">
       <div class="who"><span>SS</span><span style="color:#9a9aa2">လူ ရွေး ▾</span></div>
       <div class="btnrow"><span>Paste</span><span>စကန်</span><span>အကျွံ</span><span class="save">သိမ်းမည်</span></div>
-      <div class="kbbar"><span id="kbToggle">⌨ Keyboard</span></div>
-      <textarea id="board" placeholder="ဒီမှာ ရိုက်ထည့်ပါ…">123=1500/500</textarea>
+      <div class="kbbar"><span id="kbToggle" class="on">⌨ Keyboard</span></div>
+      <textarea id="board" placeholder="⌨ Keyboard နဲ့ ရိုက်ပါ" readonly inputmode="none">123=1500/500</textarea>
       <div class="vbox" id="vbox">စာကြောင်း ရိုက် ရင် ဒီ မှာ ချက် ချင်း စစ် ပြ မယ်</div>
     </div>
-    <div class="kb" id="kb" style="display:none">
+    <div class="kb" id="kb">
       <div class="krow">
         <div class="k" data-t="7">7</div><div class="k" data-t="8">8</div><div class="k" data-t="9">9</div>
         <div class="k sym" data-t="⌫">⌫</div>
@@ -84,8 +84,9 @@
 
   <div class="note">
     • <b>Shortcut key</b> တွေ (အောက် ဆုံး တန်း): ဒဲ့ / ကျန် / R / ထွိုင် — နှိပ် လိုက် ရင် စာသား တစ်ခါ တည်း ဝင်<br>
-    • ဒီ keyboard နဲ့ ရိုက် လည်း <b>စစ်ဘုတ် က အမြဲ စစ်</b> တယ် — phone keyboard ပြန် ခေါ် စ ရာ မ လို<br>
-    • <b>⌨ ခလုပ်</b>: နှိပ် ရင် ပေါ်, ပြန် နှိပ် ရင် ပျောက် — လို မှ ခေါ် သုံး, ပိတ် ထား ရင် phone keyboard ပုံ မှန် သုံး လို့ ရ<br>
+    • စာရိုက်ကွက် <b>လော့ခ်</b> ထား တယ် — ဖုန်း keyboard ပေါ် မ လာ တော့ ဘူး, ဒီ keyboard နဲ့ ပဲ ရိုက် ရ မယ်<br>
+    • ဒီ keyboard နဲ့ ရိုက် လည်း <b>စစ်ဘုတ် က အမြဲ စစ်</b> တယ်<br>
+    • <b>⌨ ခလုပ်</b>: နှိပ် ရင် ပေါ်, ပြန် နှိပ် ရင် ပျောက်<br>
     • Viber က စာ ကို <b>Paste</b> နဲ့ ဆက် သုံး လို့ ရ တယ်<br>
     • ဒါ အကြမ်း — ကြိုက် မှ အစစ် app ထဲ ထည့် မယ်. key နေရာ/အရွယ် ပြင် ချင် တာ ရှိ ရင် ပြော
   </div>
@@ -113,6 +114,8 @@
     vbox.innerHTML = html;
   }
   board.addEventListener('input', validate);
+  /* v5: board locked — the phone keyboard never pops up, entry only via the custom keyboard */
+  board.addEventListener('focus', function () { board.blur(); });
   var kb = document.getElementById('kb'), tg = document.getElementById('kbToggle');
   tg.addEventListener('click', function () {
     var open = kb.style.display !== 'none';
