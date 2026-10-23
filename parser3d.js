@@ -40,6 +40,28 @@
     return out;
   }
 
+  // Rule B split builder (Pho, Oct 24): consecutive numbers sharing one
+  // digit-set form ONE group - straights are the listed members, kyan is the
+  // set's remaining perms. A different number in between BREAKS the group:
+  // each lone number then carries its own family (its other perms at the
+  // second price, cross-listed perms and duplicates kept).
+  // 236-263 -> 2 + 4 | 356-563-365 -> 3 + 3 | 895-632-958 -> 3 + 15.
+  function splitItems(orderedNums, sAmt, oAmt) {
+    var straights = [], kyans = [];
+    function keyOf(n) { return n.split('').sort().join(''); }
+    var i = 0;
+    while (i < orderedNums.length) {
+      var key = keyOf(orderedNums[i]), group = [];
+      while (i < orderedNums.length && keyOf(orderedNums[i]) === key) { group.push(orderedNums[i]); i++; }
+      var listed = {};
+      group.forEach(function (n) { listed[n] = 1; straights.push({ number: n, amount: sAmt }); });
+      perms3(group[0][0], group[0][1], group[0][2]).forEach(function (pn) {
+        if (!listed[pn]) kyans.push({ number: pn, amount: oAmt });
+      });
+    }
+    return { straights: straights, kyans: kyans };
+  }
+
   function finish(numbers, amount, formula, kind) {
     var items = numbers.map(function (n) { return { number: n, amount: amount }; });
     return finishItems(items, formula, kind);
@@ -125,19 +147,12 @@
       var subs2 = m[1].split(/\s+/);
       var sA = parseInt(m[2], 10), oA = parseInt(m[4], 10);
       if (!(sA > 0) || !(oA > 0)) return invalid(raw);
-      var seen2 = {}, S2 = [];
-      subs2.forEach(function (n) { if (!seen2[n]) { seen2[n] = 1; S2.push(n); } });
-      var items2 = S2.map(function (n) { return { number: n, amount: sA }; });
-      var inS2 = {}; S2.forEach(function (n) { inS2[n] = 1; });
-      S2.forEach(function (n) {
-        perms3(n[0], n[1], n[2]).forEach(function (pn) {
-          if (!inS2[pn]) { inS2[pn] = 1; items2.push({ number: pn, amount: oA }); }
-        });
-      });
+      var spA = splitItems(subs2, sA, oA);
+      var items2 = spA.straights.concat(spA.kyans);
       // If the bettor wrote the remaining count (k<n>), it must agree.
-      if (m[3] !== undefined && parseInt(m[3], 10) !== items2.length - S2.length) return invalid(raw);
+      if (m[3] !== undefined && parseInt(m[3], 10) !== spA.kyans.length) return invalid(raw);
       var rS = finishItems(items2, raw, 'split');
-      rS.head = S2.length;
+      rS.head = subs2.length;
       return rS;
     }
     // Space subjects + ကျန်<count>ကွက် form: "567 765 15000k4q5000".
@@ -146,18 +161,11 @@
       var subs3 = m[1].split(/\s+/);
       var sA3 = parseInt(m[2], 10), cnt3 = parseInt(m[3], 10), oA3 = parseInt(m[4], 10);
       if (!(sA3 > 0) || !(oA3 > 0)) return invalid(raw);
-      var seen3 = {}, S3 = [];
-      subs3.forEach(function (n) { if (!seen3[n]) { seen3[n] = 1; S3.push(n); } });
-      var items3 = S3.map(function (n) { return { number: n, amount: sA3 }; });
-      var inS3 = {}; S3.forEach(function (n) { inS3[n] = 1; });
-      S3.forEach(function (n) {
-        perms3(n[0], n[1], n[2]).forEach(function (pn) {
-          if (!inS3[pn]) { inS3[pn] = 1; items3.push({ number: pn, amount: oA3 }); }
-        });
-      });
-      if (cnt3 !== items3.length - S3.length) return invalid(raw);
+      var spB = splitItems(subs3, sA3, oA3);
+      var items3 = spB.straights.concat(spB.kyans);
+      if (cnt3 !== spB.kyans.length) return invalid(raw);
       var rS3 = finishItems(items3, raw, 'split');
-      rS3.head = S3.length;
+      rS3.head = subs3.length;
       return rS3;
     }
     // Space subjects, straight list: "567 765 15000".
@@ -211,6 +219,14 @@
       while (pos < s.length && s[pos] === ' ') pos++;
       if (pos >= s.length) { rest = ''; break; }
       var ch = s[pos];
+      // Chained '=' list with a split tail (Pho ex. 4): 234=890=324=098dae6000ar3000.
+      // '=' counts as a member separator only when another member clearly
+      // follows: exactly 3 digits, then a separator / '=' / dae keyword -
+      // never a split marker (R r @ / kyan ar), which would mean price tail.
+      if (ch === '=' && /^=\d{3}(?!\d)/.test(s.slice(pos)) && pos + 4 < s.length &&
+          '= -~,. *ဒ'.indexOf(s[pos + 4]) >= 0) {
+        lastSep = '='; pos++; continue;
+      }
       if (ch === '-' || ch === '~' || ch === ',' || ch === '.' || ch === '*') {
         lastSep = ch;
         var runStart = pos;
@@ -250,19 +266,37 @@
       if (!(bAmt > 0)) return invalid(raw);
       return finish(S, bAmt, raw, (members.length === 1 && members[0].nums.length === 1) ? 'single' : 'list');
     }
-    // Split tail: = A (R|r|ar) B
-    tm = rest.match(/^\s*=\s*(\d+)\s*(?:ကျန်အာ|ကျန်|R|r|အာ|@|\/)\s*(\d+)$/);
+    // Split tails: = A (marker) B, or a list + dae A ar B (Pho's ex. 4 form).
+    tm = rest.match(/^\s*=\s*(\d+)\s*(?:ကျန်အာ|ကျန်|R|r|အာ|@|\/)\s*(\d+)$/) ||
+         rest.match(/^\s*ဒဲ့\s*(\d+)\s*(?:အာ|ကျန်)\s*(\d+)$/);
     if (tm) {
       var sAmt = parseInt(tm[1], 10), oAmt = parseInt(tm[2], 10);
       if (!(sAmt > 0) || !(oAmt > 0)) return invalid(raw);
-      var inS = {}, items = S.map(function (n) { inS[n] = 1; return { number: n, amount: sAmt }; });
-      S.forEach(function (n) {
-        perms3(n[0], n[1], n[2]).forEach(function (pn) {
-          if (!inS[pn]) { inS[pn] = 1; items.push({ number: pn, amount: oAmt }); }
+      // Segments: runs of plain numbers follow Rule B grouping; a block
+      // member (series/triple set) keeps the old union behaviour, scoped so
+      // its kyan never re-prices a number already listed anywhere.
+      var allS = [], allK = [], run = [], listedAll = {};
+      members.forEach(function (mem) { mem.nums.forEach(function (n) { listedAll[n] = 1; }); });
+      function flushRun() {
+        if (!run.length) return;
+        var sp = splitItems(run, sAmt, oAmt);
+        allS = allS.concat(sp.straights); allK = allK.concat(sp.kyans); run = [];
+      }
+      members.forEach(function (mem) {
+        if (mem.nums.length === 1) { run.push(mem.nums[0]); return; }
+        flushRun();
+        var bSeen = {};
+        mem.nums.forEach(function (n) { if (!bSeen[n]) { bSeen[n] = 1; allS.push({ number: n, amount: sAmt }); } });
+        var bK = {};
+        mem.nums.forEach(function (n) {
+          perms3(n[0], n[1], n[2]).forEach(function (pn) {
+            if (!listedAll[pn] && !bK[pn]) { bK[pn] = 1; allK.push({ number: pn, amount: oAmt }); }
+          });
         });
       });
-      var rr = finishItems(items, raw, 'split');
-      rr.head = S.length;
+      flushRun();
+      var rr = finishItems(allS.concat(allK), raw, 'split');
+      rr.head = allS.length;
       return rr;
     }
     // Permutation tail: (@|R|r|ar) A
