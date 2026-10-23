@@ -120,7 +120,7 @@
 
     // Space-separated subjects (Pho Oct 22): "567 765 15000k1000"-family.
     // Split with optional kyan-count check + stacked marker.
-    m = s.match(/^(\d{3}(?:\s+\d{3})+?)\s*(\d+)\s*(?:ကျန်အာ|ကျန်|အာ|R|r|@)\s*(?:(\d+)\s*ကွက်\s*)?(\d+)$/);
+    m = s.match(/^(\d{3}(?:\s+\d{3})+?)\s*(\d+)\s*(?:ကျန်အာ|ကျန်|အာ|R|r|@|\/)\s*(?:(\d+)\s*ကွက်\s*)?(\d+)$/);
     if (m) {
       var subs2 = m[1].split(/\s+/);
       var sA = parseInt(m[2], 10), oA = parseInt(m[4], 10);
@@ -251,7 +251,7 @@
       return finish(S, bAmt, raw, (members.length === 1 && members[0].nums.length === 1) ? 'single' : 'list');
     }
     // Split tail: = A (R|r|ar) B
-    tm = rest.match(/^\s*=\s*(\d+)\s*(?:ကျန်အာ|ကျန်|R|r|အာ|@)\s*(\d+)$/);
+    tm = rest.match(/^\s*=\s*(\d+)\s*(?:ကျန်အာ|ကျန်|R|r|အာ|@|\/)\s*(\d+)$/);
     if (tm) {
       var sAmt = parseInt(tm[1], 10), oAmt = parseInt(tm[2], 10);
       if (!(sAmt > 0) || !(oAmt > 0)) return invalid(raw);
