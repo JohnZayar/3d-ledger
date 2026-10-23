@@ -251,6 +251,35 @@
     $('lastTotal').textContent = fmt(last);
   }
   $('board').addEventListener('input', parseBoard);
+
+  /* ---------- quick keyboard (mock-approved layout, Oct 24) ---------- */
+  var kbOpen = false;
+  function kbSetCaret(pos) { try { $('board').setSelectionRange(pos, pos); } catch (e) {} }
+  on('kbToggle', 'click', function () {
+    kbOpen = !kbOpen;
+    var kb = $('kb'); if (!kb) return;
+    kb.style.display = kbOpen ? 'block' : 'none';
+    $('kbToggle').classList.toggle('on', kbOpen);
+    $('sec-entry').style.paddingBottom = kbOpen ? (kb.offsetHeight + 18) + 'px' : '';
+    if (kbOpen) $('board').focus();
+  });
+  on('kb', 'click', function (e) {
+    var k = e.target.closest('.k'); if (!k) return;
+    var t = k.getAttribute('data-t');
+    var b = $('board'); if (!b) return;
+    var st = b.selectionStart == null ? b.value.length : b.selectionStart;
+    var en = b.selectionEnd == null ? st : b.selectionEnd;
+    b.focus();
+    if (t === '⌫') {
+      if (en > st) { b.value = b.value.slice(0, st) + b.value.slice(en); kbSetCaret(st); }
+      else if (st > 0) { b.value = b.value.slice(0, st - 1) + b.value.slice(st); kbSetCaret(st - 1); }
+    } else {
+      var ins = t === '⏎' ? '\n' : t;
+      b.value = b.value.slice(0, st) + ins + b.value.slice(en);
+      kbSetCaret(st + ins.length);
+    }
+    b.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   $('entryPerson').addEventListener('change', parseBoard);
 
   /* ---------- photo scan intake (Pho Oct 22) ----------
