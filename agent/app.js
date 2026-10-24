@@ -1,5 +1,9 @@
-/* 3D Agent v6 — local-first + server sync (sync3d).
+/* 3D Agent v7 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
+   Separateness (Pho Oct 24, သတ်သတ်စီ): this app shows ONLY its
+   own bettors — never Master people, never other agents' bettors,
+   never agent-registry rows. Agent-terms settlement lives in
+   Master; this app's own အချုပ် stays on bettor rates.
    Acks (Pho Oct 24, 2D-style): a save entering Master's ledger is
    auto-acked; this app's vouchers show "ok" on acked batches.
    No ledger / winning / over-limit / blocked screens — those are Master's.
@@ -214,8 +218,12 @@
   }
 
   /* ---------- people ---------- */
+  // Pho Oct 24 (သတ်သတ်စီ): the Agent shows ONLY its own bettors.
+  // Master people, other agents' bettors and agent-registry rows
+  // never list here — each agent's list is its own alone.
+  function agentVisiblePeople() { return state.people.filter(function (p) { return p.role !== 'agent' && p.agentId === state.agentCode; }); }
   function renderPeople() {
-    var opts = state.people.map(function (p) {
+    var opts = agentVisiblePeople().map(function (p) {
       return '<option value="' + p.id + '">' + esc(p.name) + '</option>';
     }).join('');
     var ep = $('entryPerson'), vp = $('voucherPerson');
@@ -224,7 +232,7 @@
     if (keepE && person(keepE)) ep.value = keepE;
     vp.innerHTML = state.people.length ? opts : '<option value="">—</option>';
     if (keepV && person(keepV)) vp.value = keepV;
-    $('peopleList').innerHTML = state.people.map(function (p) {
+    $('peopleList').innerHTML = agentVisiblePeople().map(function (p) {
       return '<div class="prow" data-pid="' + p.id + '"><span class="nm">' + esc(p.name) + '</span>' +
         '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '-' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' + (p.closedLimit != null ? '<span>ပိတ် ' + esc(fmt(p.closedLimit)) + '</span>' : '') + '</div>';
     }).join('');
@@ -377,6 +385,32 @@
     });
     return bad;
   }
+  // Agent aggregate hot-limit (Pho Oct 24): the agent-person's
+  // closedLimit (set by Master) caps THIS agent's total for
+  // blocked-list numbers across all its bettors in the session.
+  function agentClosedViolation(code, items, excludeLineId) {
+    var ap = state.people.find(function (p) { return p.role === 'agent' && p.agentId === code; });
+    if (!ap || ap.closedLimit == null) return null;
+    var list = sess().blocked || [];
+    if (!list.length) return null;
+    var sums = {};
+    (items || []).forEach(function (it) {
+      if (list.indexOf(it.number) >= 0) sums[it.number] = (sums[it.number] || 0) + it.amount;
+    });
+    if (!Object.keys(sums).length) return null;
+    var existing = {};
+    sessRecords().forEach(function (r) {
+      if (r.agentId !== code) return;
+      if (excludeLineId && r.lineId === excludeLineId) return;
+      if (list.indexOf(r.number) >= 0) existing[r.number] = (existing[r.number] || 0) + r.amount;
+    });
+    var bad = null;
+    Object.keys(sums).forEach(function (n) {
+      var tot = (existing[n] || 0) + sums[n];
+      if (tot > ap.closedLimit && !bad) bad = { n: n, cap: ap.closedLimit, tot: tot };
+    });
+    return bad;
+  }
 
   $('saveBtn').addEventListener('click', function () {
     if (winLocked()) { $('entryStatus').textContent = lockPrefix() + ' — ထိုး မရတော့ပါ'; return; }
@@ -387,7 +421,11 @@
     var s = sess();
     var newItems = [];
     valid.forEach(function (r) { r.items.forEach(function (it) { newItems.push(it); }); });
+    var sp = person(pid);
+    if (!sp || sp.role === 'agent' || sp.agentId !== state.agentCode) { $('entryStatus').textContent = 'ဒီလူကို ရွေးလို့ မရပါ'; return; }
     var badC = closedViolation(pid, newItems, null);
+    var badA = agentClosedViolation(state.agentCode, newItems, null);
+    if (badA) { $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' — Agent စုစုပေါင်း limit ' + fmt(badA.cap) + ' ကျော် နေတယ် (' + fmt(badA.tot) + ' ဖက် နေ)'; return; }
     if (badC) {
       $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + badC.n + ' — ' + person(pid).name +
         ' limit ' + fmt(badC.cap) + ' ကျော် နေတယ် (' + fmt(badC.tot) + ' ဖက် နေ)';
@@ -545,6 +583,8 @@
     var r = window.Parser3D.parseLine($('lmInput').value);
     if (!r.ok) { $('lmHint').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
     var badL = closedViolation(recs[0].personId, r.items, menuLineId);
+    var badA = recs[0].agentId ? agentClosedViolation(recs[0].agentId, r.items, menuLineId) : null;
+    if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' Agent စုစုပေါင်း limit ' + fmt(badA.cap) + ' ကျော် နေတယ်'; return; }
     if (badL) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badL.n + ' limit ' + fmt(badL.cap) + ' ကျော် နေတယ်'; return; }
     var first = recs[0];
     var idx = state.records.indexOf(first);
