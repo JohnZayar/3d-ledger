@@ -1,4 +1,4 @@
-/* 3D Master v48 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
+/* 3D Master v49 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -376,8 +376,10 @@
   function parseBoard() {
     var lines = $('board').value.split('\n');
     lastParse = [];
-    lines.forEach(function (ln) {
+    var lineIdx = [];
+    lines.forEach(function (ln, li) {
       if (!ln.trim()) return;
+      lineIdx.push(li);
       lastParse.push(parseLine(ln));
     });
     var valid = lastParse.filter(function (r) { return r.ok; });
@@ -388,15 +390,15 @@
         if (r.kind === 'split') {
           var head = r.head || 1;
           var sIt = r.items.slice(0, head), rIt = r.items.slice(head);
-          return '<div>' + esc(r.formula) + ' → ' + head + ' လုံး × ' + fmt(sIt[0].amount) +
+          return '<div data-idx="' + lineIdx[lastParse.indexOf(r)] + '" style="-webkit-touch-callout:none;user-select:none">' + esc(r.formula) + ' → ' + head + ' လုံး × ' + fmt(sIt[0].amount) +
             (rIt.length ? ' + ကျန် ' + rIt.length + ' × ' + fmt(rIt[0].amount) : '') + '</div>';
         }
         if (r.kind === 'daekyan') {
           var rest = r.items.slice(1);
-          return '<div>' + esc(r.formula) + ' → ဒဲ့ ' + fmt(r.items[0].amount) +
+          return '<div data-idx="' + lineIdx[lastParse.indexOf(r)] + '" style="-webkit-touch-callout:none;user-select:none">' + esc(r.formula) + ' → ဒဲ့ ' + fmt(r.items[0].amount) +
             (rest.length ? ' + ကျန် ' + rest.length + ' × ' + fmt(rest[0].amount) : '') + '</div>';
         }
-        return '<div>' + esc(r.formula) + ' → ' + r.count + ' ကွက် × ' + fmt(r.items[0].amount) + '</div>';
+        return '<div data-idx="' + lineIdx[lastParse.indexOf(r)] + '" style="-webkit-touch-callout:none;user-select:none">' + esc(r.formula) + ' → ' + r.count + ' ကွက် × ' + fmt(r.items[0].amount) + '</div>';
       }).join('');
       var tc = valid.reduce(function (a, r) { return a + r.count; }, 0);
       var tt = valid.reduce(function (a, r) { return a + r.total; }, 0);
@@ -405,7 +407,7 @@
     } else pv.style.display = 'none';
     var bb = $('badbox');
     if (bad.length) {
-      bb.innerHTML = bad.map(function (r) { return '<div>' + esc(r.formula) + '</div>'; }).join('');
+      bb.innerHTML = bad.map(function (r) { return '<div data-idx="' + lineIdx[lastParse.indexOf(r)] + '" style="-webkit-touch-callout:none;user-select:none">' + esc(r.formula) + '</div>'; }).join('');
       bb.style.display = 'block';
     } else bb.style.display = 'none';
     $('saveBtn').disabled = !(valid.length && $('entryPerson').value);
@@ -426,6 +428,33 @@
     $('lastTotal').textContent = fmt(last);
   }
   $('board').addEventListener('input', parseBoard);
+
+  /* Long-press a preview/badbox row to delete that board line (Pho, Oct 24):
+     hold ~0.5s on a row and the line is gone — no confirm, like the
+     competitor apps. Rows carry their board line index in data-idx. */
+  function deleteBoardLine(li) {
+    var ls = $('board').value.split('\n');
+    if (li < 0 || li >= ls.length) return;
+    ls.splice(li, 1);
+    $('board').value = ls.join('\n');
+    parseBoard();
+    $('board').focus();
+  }
+  function bindRowDelete(el) {
+    var timer = null;
+    el.addEventListener('pointerdown', function (e) {
+      var row = e.target.closest ? e.target.closest('[data-idx]') : null;
+      if (!row) return;
+      var li = parseInt(row.getAttribute('data-idx'), 10);
+      timer = setTimeout(function () { timer = null; deleteBoardLine(li); }, 500);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel', 'pointermove'].forEach(function (ev) {
+      el.addEventListener(ev, function () { if (timer) { clearTimeout(timer); timer = null; } });
+    });
+    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  }
+  bindRowDelete($('preview'));
+  bindRowDelete($('badbox'));
 
   /* ---------- quick keyboard (mock-approved layout, Oct 24) ---------- */
   var kbOpen = false;
