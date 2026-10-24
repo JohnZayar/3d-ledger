@@ -1,4 +1,4 @@
-/* 3D Master v46 — local-first + server sync (sync3d). Agent privacy + Buyer/Agent management + automatic acks + buyer self-service agents (Pho Oct 24, 2D mirror: buyer issues own agent codes from own Master; limit 5 default in app_settings, Pho raises it from the Buyer list). */
+/* 3D Master v47 — local-first + server sync (sync3d). Agent privacy + Buyer management + automatic acks + buyer self-service agents (Pho Oct 24, 2D-exact: Pho does NOT see buyers' agent lists — buyers manage their own agents; Pho: create buyers, raise limits, disable/delete only). */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -1061,7 +1061,7 @@
   });
   on('serverLogoutBtn', 'click', function () {
     if (window.Sync3D) window.Sync3D.logout();
-    buyerListLoaded = false; myAgentListLoaded = false; currentAgentTenant = null; currentAgentShop = '';
+    buyerListLoaded = false; myAgentListLoaded = false;
     renderSyncStatus(); render();
   });
   on('syncNowBtn', 'click', syncNowUI);
@@ -1118,7 +1118,7 @@
     var m = String(code || '').match(/^[^-]+-(\d+)-/);
     return m ? parseInt(m[1], 10) : 0;
   }
-  var buyerListLoaded = false, myAgentListLoaded = false, currentAgentTenant = null, currentAgentShop = '';
+  var buyerListLoaded = false, myAgentListLoaded = false;
   function renderBuyerSec() {
     var sec = $('buyerSec'); if (sec) {
       if (!isPho()) { sec.style.display = 'none'; }
@@ -1185,20 +1185,12 @@
         // Enabling it here fixes the row on the next refresh.
         if (!b.email) pbReq('PATCH', '/collections/users/records/' + encodeURIComponent(b.id), { emailVisibility: true }).catch(function () {});
         html += '<div class="setrow"><span>' + esc(em ? em + ' · ' + (b.name || '') : (b.name || '')) + '</span><span class="' + (dis ? 'neg' : 'pos') + '">' + (dis ? 'ပိတ်' : 'ဖွင့်') + '</span></div>' +
-          '<div class="btnrow"><button class="btn gray" data-buyer-agents="' + b.id + '" data-tenant="' + esc(tid) + '" data-shop="' + esc(b.name || '') + '">Agent များ</button>' +
+          '<div class="btnrow">' +
           '<button class="btn ' + (dis ? 'gray' : '') + '" data-buyer-toggle="' + b.id + '" data-disable="' + (dis ? '0' : '1') + '">' + (dis ? 'ဖွင့်' : 'ပိတ်') + '</button>' +
           '<button class="btn gray" data-buyer-del="' + b.id + '" data-email="' + esc(em) + '">ဖျက်</button>' +
           '<button class="btn gray" data-limit-edit="' + esc(tid) + '" data-limit="' + lim + '">Agent ' + lim + ' ဦး ✏️</button></div>';
       });
       box.innerHTML = html;
-      box.querySelectorAll('[data-buyer-agents]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          currentAgentTenant = btn.getAttribute('data-tenant');
-          currentAgentShop = btn.getAttribute('data-shop');
-          $('agentBuyerLabel').textContent = currentAgentShop ? ('— ' + currentAgentShop) : '';
-          renderAgentList();
-        });
-      });
       box.querySelectorAll('[data-buyer-toggle]').forEach(function (btn) {
         btn.addEventListener('click', function () {
           toggleBuyer(btn.getAttribute('data-buyer-toggle'), btn.getAttribute('data-disable') === '1');
@@ -1246,7 +1238,6 @@
     }).then(function () {
       $('buyerStatus').textContent = disable ? 'ပိတ်ပြီးပြီ' : 'ဖွင့်ပြီးပြီ';
       renderBuyerList();
-      if (currentAgentTenant) renderAgentList();
     }).catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
   }
   function deleteBuyer(bid, email) {
@@ -1272,40 +1263,13 @@
       return pbReq('DELETE', '/collections/users/records/' + encodeURIComponent(bid));
     }).then(function () {
       $('buyerStatus').textContent = 'ဖျက်ပြီးပြီ';
-      if (currentAgentTenant) { currentAgentTenant = null; $('agentList').innerHTML = ''; $('agentBuyerLabel').textContent = ''; }
       renderBuyerList();
     }).catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
-  }
-  function renderAgentList() {
-    var box = $('agentList'); if (!box) return;
-    if (!currentAgentTenant) { box.innerHTML = '<div class="status">Buyer စာရင်းက Agent များ ကို နှိပ်ပြီး buyer ရွေးပါ</div>'; return; }
-    box.innerHTML = '<div class="status">တင်နေတယ်…</div>';
-    pbList('3d_agents', { filter: 'tenant="' + currentAgentTenant + '"', perPage: 100 }).then(function (res) {
-      var items = res.items || [];
-      if (!items.length) { box.innerHTML = '<div class="status">Agent မရှိသေးပါ</div>'; return; }
-      var html = '';
-      items.forEach(function (a) {
-        var dis = !!a.disabled;
-        html += '<div class="setrow"><span>' + esc(a.name || '') + '</span><span class="' + (dis ? 'neg' : 'pos') + '">' + (dis ? 'ပိတ်' : 'ဖွင့်') + '</span></div>' +
-          '<div class="status">Code: <b>' + esc(a.code || '') + '</b></div>' +
-          '<div class="btnrow"><button class="btn ' + (dis ? 'gray' : '') + '" data-agent-toggle="' + a.id + '" data-disable="' + (dis ? '0' : '1') + '" data-code="' + esc(a.code || '') + '">' + (dis ? 'ဖွင့်' : 'ပိတ်') + '</button>' +
-          '<button class="btn gray" data-agent-del="' + a.id + '" data-code="' + esc(a.code || '') + '">ဖျက်</button></div>';
-      });
-      box.innerHTML = html;
-      box.querySelectorAll('[data-agent-toggle]').forEach(function (btn) {
-        btn.addEventListener('click', function () { toggleAgent(btn.getAttribute('data-agent-toggle'), btn.getAttribute('data-code'), btn.getAttribute('data-disable') === '1'); });
-      });
-      box.querySelectorAll('[data-agent-del]').forEach(function (btn) {
-        btn.addEventListener('click', function () { deleteAgent(btn.getAttribute('data-agent-del'), btn.getAttribute('data-code')); });
-      });
-    }).catch(function (e) {
-      box.innerHTML = '<div class="status">မရဘူး: ' + esc(e.message || 'error') + '</div>';
-    });
   }
   function toggleAgent(aid, code, disable, tidArg) {
     if (!confirm('ဒီ agent ကို ' + (disable ? 'ပိတ်' : 'ဖွင့်') + 'မလား?')) return;
     var n = agentNumFromCode(code);
-    var tid = tidArg || currentAgentTenant;
+    var tid = tidArg;
     pbReq('PATCH', '/collections/3d_agents/records/' + encodeURIComponent(aid), { disabled: disable }).then(function () {
       if (tid && n) {
         return pbList('users', { filter: 'email="' + agent3dEmail(tid, n) + '"', perPage: 5 }).then(function (res) {
@@ -1313,13 +1277,13 @@
           if (u) return pbReq('PATCH', '/collections/users/records/' + u.id, { disabled: disable }).catch(function () {});
         }).catch(function () {});
       }
-    }).then(function () { renderAgentList(); renderBuyerList(); renderMyAgentList(); })
+    }).then(function () { renderMyAgentList(); })
     .catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
   }
   function deleteAgent(aid, code, tidArg) {
     if (!confirm('ဒီ agent (' + code + ') ကို အပြီးဖျက်မလား?')) return;
     var n = agentNumFromCode(code);
-    var tid = tidArg || currentAgentTenant;
+    var tid = tidArg;
     var job = Promise.resolve();
     if (tid && n) {
       job = pbList('users', { filter: 'email="' + agent3dEmail(tid, n) + '"', perPage: 5 }).then(function (res) {
@@ -1331,7 +1295,7 @@
       return pbReq('DELETE', '/collections/3d_agents/records/' + encodeURIComponent(aid));
     }).then(function () {
       $('buyerStatus').textContent = 'ဖျက်ပြီးပြီ';
-      renderAgentList(); renderMyAgentList();
+      renderMyAgentList();
     }).catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
   }
   on('buyerRefreshBtn', 'click', renderBuyerList);
@@ -1372,38 +1336,6 @@
       $('buyerStatus').textContent = msg;
     }).then(function () { btn.disabled = false; btn.textContent = 'Buyer အသစ် ဖန်တီး'; });
   });
-  on('agentCreateBtn', 'click', function () {
-    if (!isPho()) { $('buyerStatus').textContent = 'ခွင့်မရှိပါ'; return; }
-    if (!currentAgentTenant) { $('buyerStatus').textContent = 'အရင် Buyer စာရင်းက Agent များ ကို နှိပ်ပါ'; return; }
-    var tid = currentAgentTenant;
-    var btn = $('agentCreateBtn'); btn.disabled = true; btn.textContent = 'လုပ်နေတယ်…';
-    var box = $('agentResult'); box.style.display = 'none';
-    pbList('3d_agents', { filter: 'tenant="' + tid + '"', perPage: 100 }).then(function (res) {
-      var items = res.items || [];
-      return getAgentLimit(tid).then(function (lim) {
-      if (items.length >= lim) throw new Error('Agent ' + lim + ' ဦးပြည့်နေပြီ');
-      var maxN = 0;
-      items.forEach(function (a) { var n = agentNumFromCode(a.code); if (n > maxN) maxN = n; });
-      var n = maxN + 1;
-      var name = ($('agentName').value || '').trim() || ('Agent ' + n);
-      var secret = randChars('ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789', 8);
-      var code = agent3dCode(tid, n, secret);
-      var pass = agent3dPass(tid, n, secret);
-      var userName = currentAgentShop ? (name + ' (' + currentAgentShop + ')') : name;
-      return pbReq('POST', '/collections/users/records', { email: agent3dEmail(tid, n), password: pass, passwordConfirm: pass, name: userName, tenant: tid, emailVisibility: true }).then(function () {
-        return pbReq('POST', '/collections/3d_agents/records', { tenant: tid, code: code, name: name, disabled: false }).then(function () { return { code: code, name: name }; });
-      });
-      });
-    }).then(function (ag) {
-      box.style.display = '';
-      box.innerHTML = '<div>Agent ' + esc(ag.name) + ' Code: <b>' + esc(ag.code) + '</b></div><div class="status">ကူးယူထားပါ</div>';
-      $('agentName').value = '';
-      renderAgentList();
-    }).catch(function (e) {
-      $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error');
-    }).then(function () { btn.disabled = false; btn.textContent = 'Agent အသစ် ဖန်တီး'; });
-  });
-
   /* ---------- own agents (buyer self-service, 2D mirror) ----------
      Any logged-in Master user lists/creates/toggles/deletes agents
      of their OWN tenant only, within their tenant's limit (default
