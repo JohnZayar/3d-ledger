@@ -134,7 +134,7 @@
   <!-- ဆက်တင် -->
   <section class="sec" id="sec-settings">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
-    <div class="setrow"><span>App Version</span><b>v45</b></div>
+    <div class="setrow"><span>App Version</span><b>v46</b></div>
     <div class="setrow"><span>ပွဲစဉ်</span><button class="danger" id="closeToggle">ပွဲစဉ် ပိတ်မည်</button></div>
     <div class="setrow"><span>Server Sync</span><button class="sbtn" id="syncNowBtn">Sync</button></div>
     <input class="inp" id="serverEmail" type="email" autocomplete="off" placeholder="Server email">
@@ -155,6 +155,14 @@
       <div class="frow"><button class="btn" id="agentCreateBtn">Agent အသစ် ဖန်တီး</button></div>
       <div id="agentResult" style="display:none"></div>
       <div id="agentList"></div>
+    </div>
+    <div id="myAgentsSec" style="display:none">
+      <div class="setrow"><span>ကိုယ့် Agent များ</span><button class="sbtn" id="myAgentRefreshBtn">Refresh</button></div>
+      <input class="inp" id="myAgentName" autocomplete="off" placeholder="Agent နာမည် (မထည့်ရင် Agent N)">
+      <div class="frow"><button class="btn" id="myAgentCreateBtn">Agent အသစ် ဖန်တီး</button></div>
+      <div id="myAgentResult" style="display:none"></div>
+      <div class="status" id="myAgentStatus"></div>
+      <div id="myAgentList"></div>
     </div>
     <div class="setrow"><span>App Reset</span><button class="danger" id="resetBtn">အကုန် ရှင်း</button></div>
   </section>
@@ -196,7 +204,7 @@
 
 <script src="parser3d.js?v=17"></script>
 <script src="sync3d.js?v=3"></script>
-<script src="app.js?v=35"></script>
+<script src="app.js?v=36"></script>
 
 <div id="lineMenu" class="sheet" style="display:none">
   <div class="sheetCard">
