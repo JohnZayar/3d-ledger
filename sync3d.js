@@ -388,6 +388,17 @@
       _queue().sort(function (a, b) { return (a.created || 0) - (b.created || 0); }).forEach(function (entry) {
         chain = chain.then(function () {
           if (adopted[entry.id]) return;
+          /* Agent hold (Oct 24 phantom-session lesson): NEVER push
+             records before the Agent has SEEN a server session. Until
+             the first pull adopts the Master's round, local records
+             carry the seed session id — pushing them orphans them on
+             the server (Master shows 0). Held ops stay queued;
+             adoption re-keys them, and the next push sends them
+             under the server session id. */
+          if (_cfg.role === 'agent' && entry.op === 'create' && entry.collection === '3d_records') {
+            var seenNow = (_meta().seen || {})['3d_sessions'] || [];
+            if (!seenNow.length) return;
+          }
           return pushOne(entry).then(function () {
             _setQueue(_queue().filter(function (x) { return x.id !== entry.id; }));
             pushed++;
