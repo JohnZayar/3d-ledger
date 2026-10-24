@@ -1,4 +1,4 @@
-/* 3D Master v40 — local-first + server sync (sync3d). */
+/* 3D Master v43 — local-first + server sync (sync3d). Agent privacy (Pho Oct 24): agent bettors never list in Master; agent records show only under the agent's name. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -36,6 +36,7 @@
     } catch (e) { return null; }
   }
   var state = load() || seed();
+  if (!state.agentNames) state.agentNames = {}; // code -> agent display name (3d_agents)
   if (window.Sync3D) {
     try {
       window.Sync3D.init({ role: 'master', authKey: '3dMasterAuth', queueKey: '3dMasterQueue', metaKey: '3dMasterMeta' });
@@ -51,7 +52,7 @@
 
   /* ---------- sync wiring (Pho Oct 24) ---------- */
   function Q(op, coll, id, obj) { try { if (window.Sync3D) window.Sync3D.queue(op, coll, id, obj); } catch (e) {} }
-  function syncAfter() { save(); render(); }
+  function syncAfter() { save(); render(); refreshAgentNames(); }
   function syncStatusText() {
     if (!window.Sync3D) return 'Sync မရှိ';
     if (!window.Sync3D.isLoggedIn()) return 'Server မချိတ်သေး — အောက် login မှာ ဝင်ပါ';
@@ -89,6 +90,54 @@
     return state.sessions.find(function (x) { return x.id === state.currentSessionId; }) || state.sessions[0];
   }
   function person(id) { return state.people.find(function (p) { return p.id === id; }); }
+
+  /* ---------- agent privacy (Pho Oct 24) ----------
+     Agent bettors are NOT Master's people: they never appear in
+     Master's lists, and their records show only under the agent's
+     name, e.g. "(Agent) Agent 1". Their rates stay in state for
+     math only and are never rendered. */
+  function isAgentPerson(p) { return !!(p && p.agentId); }
+  function visiblePeople() { return state.people.filter(function (p) { return !isAgentPerson(p); }); }
+  function agentName(code) {
+    if (state.agentNames && state.agentNames[code]) return state.agentNames[code];
+    var m = String(code || '').match(/^[^-]+-(\d+)-/);
+    return m ? ('Agent ' + m[1]) : '';
+  }
+  function agentLabel(code) { var n = agentName(code); return '(Agent)' + (n ? ' ' + n : ''); }
+  function agentCodesInSession() {
+    var seen = {}, out = [];
+    sessRecords().forEach(function (r) { if (r.agentId && !seen[r.agentId]) { seen[r.agentId] = 1; out.push(r.agentId); } });
+    return out;
+  }
+  function restoreSel(sel, val) {
+    if (!val) return;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === val) { sel.value = val; return; }
+    }
+  }
+  // Agent display names come from the 3d_agents collection (same
+  // PocketBase as sync3d). Throttled; failures are silent and the
+  // code-derived "Agent N" fallback still renders.
+  var lastAgentNamesFetch = 0;
+  function refreshAgentNames() {
+    if (!window.Sync3D || !window.Sync3D.isLoggedIn()) return;
+    var now = Date.now();
+    if (now - lastAgentNamesFetch < 300000) return;
+    lastAgentNamesFetch = now;
+    var tok = null;
+    try { var a = JSON.parse(localStorage.getItem('3dMasterAuth') || 'null'); tok = a && a.token; } catch (e) {}
+    if (!tok) return;
+    fetch('https://2d.skylinkvpn.stream/api/collections/3d_agents/records?perPage=200', { headers: { Authorization: tok } })
+      .then(function (res) { return res.json(); })
+      .then(function (d) {
+        var map = {};
+        (d.items || []).forEach(function (it) { if (it.code) map[it.code] = it.name || ''; });
+        var changed = JSON.stringify(map) !== JSON.stringify(state.agentNames || {});
+        state.agentNames = map;
+        if (changed) { save(); render(); }
+      })
+      .catch(function () {});
+  }
   function sessRecords() {
     var sid = sess().id;
     return state.records.filter(function (r) { return r.sessionId === sid; });
@@ -168,18 +217,24 @@
 
   /* ---------- people ---------- */
   function renderPeople() {
-    // entry + voucher dropdowns
-    var opts = state.people.map(function (p) {
+    // entry + voucher dropdowns — Master's own people ONLY. Agent
+    // bettors never list here (privacy rule); the voucher dropdown
+    // gets one row per agent instead, e.g. "(Agent) Agent 1".
+    var vis = visiblePeople();
+    var opts = vis.map(function (p) {
       return '<option value="' + p.id + '">' + esc(p.name) + (p.role === 'akan' ? ' (အကန်)' : '') + '</option>';
+    }).join('');
+    var agentOpts = agentCodesInSession().map(function (c) {
+      return '<option value="agent:' + esc(c) + '">' + esc(agentLabel(c)) + '</option>';
     }).join('');
     var ep = $('entryPerson'), vp = $('voucherPerson');
     var keepE = ep.value, keepV = vp.value;
-    ep.innerHTML = state.people.length ? opts : '<option value="">—</option>';
-    if (keepE && person(keepE)) ep.value = keepE;
-    vp.innerHTML = state.people.length ? opts : '<option value="">—</option>';
-    if (keepV && person(keepV)) vp.value = keepV;
+    ep.innerHTML = vis.length ? opts : '<option value="">—</option>';
+    restoreSel(ep, keepE);
+    vp.innerHTML = (vis.length || agentOpts) ? (opts + agentOpts) : '<option value="">—</option>';
+    restoreSel(vp, keepV);
     // list
-    $('peopleList').innerHTML = state.people.map(function (p) {
+    $('peopleList').innerHTML = vis.map(function (p) {
       return '<div class="prow" data-pid="' + p.id + '">' + (p.role === 'akan' ? '<span class="tag">အကန်</span>' : '') + '<span class="nm">' + esc(p.name) + '</span>' +
         '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '-' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' + (p.closedLimit != null ? '<span>ပိတ် ' + esc(fmt(p.closedLimit)) + '</span>' : '') + '</div>';
     }).join('');
@@ -263,7 +318,7 @@
     } else bb.style.display = 'none';
     $('saveBtn').disabled = !(valid.length && $('entryPerson').value);
     if (valid.length && !$('entryPerson').value) {
-      $('entryStatus').textContent = state.people.length
+      $('entryStatus').textContent = visiblePeople().length
         ? 'အရင် လူ ရွေးပါ'
         : 'လူ မရှိသေး — လူစာရင်း မှာ အရင် ထည့်ပါ';
     } else if ($('entryStatus').textContent.indexOf('လူ') === 0 || $('entryStatus').textContent.indexOf('အရင်') === 0) {
@@ -554,6 +609,7 @@
       else if (tset && tset[r.number]) byPerson[r.personId].tote += r.amount;
     });
     var rows = '', T = { bet: 0, win: 0, tote: 0, net: 0 };
+    var agentAgg = {}, agentOrder = [];
     state.people.forEach(function (p) {
       var d = byPerson[p.id];
       if (!d) return;
@@ -563,10 +619,25 @@
         ? -d.bet * (1 - p.commission / 100) + pay
         : d.bet * (1 - p.commission / 100) - pay;
       T.bet += d.bet; T.win += d.win; T.tote += d.tote; T.net += net;
+      if (isAgentPerson(p)) {
+        // Agent bettors roll up under the agent's name ONLY (privacy
+        // rule) — their names and rates never render.
+        if (!agentAgg[p.agentId]) { agentAgg[p.agentId] = { bet: 0, win: 0, tote: 0, net: 0 }; agentOrder.push(p.agentId); }
+        var a = agentAgg[p.agentId];
+        a.bet += d.bet; a.win += d.win; a.tote += d.tote; a.net += net;
+        return;
+      }
       var nc = net < 0 ? 'neg' : (net > 0 ? 'pos' : '');
       rows += '<tr><td>' + (p.role === 'akan' ? '<span class="tag">အကန်</span> ' : '') + esc(p.name) + '</td><td>' + fmt(d.bet) + '</td><td>' + fmt(d.win) +
         '</td><td>' + fmt(d.tote) +
         '</td><td class="' + nc + '">' + fmt(net) + '</td></tr>';
+    });
+    agentOrder.forEach(function (code) {
+      var a = agentAgg[code];
+      var nc = a.net < 0 ? 'neg' : (a.net > 0 ? 'pos' : '');
+      rows += '<tr><td>' + esc(agentLabel(code)) + '</td><td>' + fmt(a.bet) + '</td><td>' + fmt(a.win) +
+        '</td><td>' + fmt(a.tote) +
+        '</td><td class="' + nc + '">' + fmt(a.net) + '</td></tr>';
     });
     var tc = T.net < 0 ? 'neg' : (T.net > 0 ? 'pos' : '');
     var html =
@@ -586,25 +657,44 @@
     var pid = $('voucherPerson').value;
     var box = $('voucherBox');
     if (!pid) { box.innerHTML = '<div class="empty">လူ မရှိသေး</div>'; return; }
-    var recs = sessRecords().filter(function (r) { return r.personId === pid; });
-    if (!recs.length) { box.innerHTML = '<div class="empty">စာရင်း မရှိသေး</div>'; return; }
-    var batches = {};
-    recs.forEach(function (r) { (batches[r.batchNo] = batches[r.batchNo] || []).push(r); });
-    var html = '';
-    Object.keys(batches).map(Number).sort(function (a, b) { return a - b; }).forEach(function (bn) {
-      var rows = batches[bn];
-      var lines = [], seen = {};
-      rows.forEach(function (r) {
-        if (!seen[r.lineId]) { seen[r.lineId] = []; lines.push(seen[r.lineId]); }
-        seen[r.lineId].push(r);
+    // batches = [{no, lines: [[recs of one line]...]}]. Person view
+    // groups by batchNo; agent view (privacy rule) groups by save
+    // (lineId) under the agent's name — never by bettor.
+    var batches = [];
+    if (pid.indexOf('agent:') === 0) {
+      var code = pid.slice(6);
+      var arecs = sessRecords().filter(function (r) { return r.agentId === code; });
+      if (!arecs.length) { box.innerHTML = '<div class="empty">စာရင်း မရှိသေး</div>'; return; }
+      var byLine = {}, order = [];
+      arecs.forEach(function (r) {
+        if (!byLine[r.lineId]) { byLine[r.lineId] = []; order.push(r.lineId); }
+        byLine[r.lineId].push(r);
       });
+      order.forEach(function (lid, i) { batches.push({ no: i + 1, lines: [byLine[lid]] }); });
+    } else {
+      var recs = sessRecords().filter(function (r) { return r.personId === pid; });
+      if (!recs.length) { box.innerHTML = '<div class="empty">စာရင်း မရှိသေး</div>'; return; }
+      var bmap = {};
+      recs.forEach(function (r) { (bmap[r.batchNo] = bmap[r.batchNo] || []).push(r); });
+      Object.keys(bmap).map(Number).sort(function (a, b) { return a - b; }).forEach(function (bn) {
+        var rows = bmap[bn];
+        var lines = [], seen = {};
+        rows.forEach(function (r) {
+          if (!seen[r.lineId]) { seen[r.lineId] = []; lines.push(seen[r.lineId]); }
+          seen[r.lineId].push(r);
+        });
+        batches.push({ no: bn, lines: lines });
+      });
+    }
+    var html = '';
+    batches.forEach(function (b) {
       var body = '', total = 0;
-      lines.forEach(function (lineRecs, li) {
+      b.lines.forEach(function (lineRecs, li) {
         var lt = lineRecs.reduce(function (a, r) { return a + r.amount; }, 0);
         total += lt;
         var label = esc(lineRecs[0].formula);
         if (lineRecs[0].isFormula || lineRecs.length > 1) label += ' (' + lineRecs.length + ')';
-        var xid = 'x' + bn + '-' + li;
+        var xid = 'x' + b.no + '-' + li;
         var rowCls = 'vline';
         if (s.winning && lineRecs.some(function (r) { return r.number === s.winning; })) rowCls += ' vwin';
         else if (vtset && lineRecs.some(function (r) { return vtset[r.number]; })) rowCls += ' vtote';
@@ -617,7 +707,7 @@
         body += '<tr id="' + xid + '" style="display:none"><td class="xpand" colspan="2"><div class="xgrid">' + chips + '</div></td></tr>';
       });
       body += '<tr class="vtot"><td colspan="2">Total ' + fmt(total) + '</td></tr>';
-      html += '<div class="vbatch"><div class="vhead">NO ' + bn + '</div>' +
+      html += '<div class="vbatch"><div class="vhead">NO ' + b.no + '</div>' +
         '<table class="vt">' + body + '</table></div>';
     });
     box.innerHTML = html;
@@ -704,7 +794,10 @@
       return {
         id: uid(), sessionId: first.sessionId, personId: first.personId,
         batchNo: first.batchNo, lineId: newLineId, number: it.number,
-        amount: it.amount, formula: r.formula, isFormula: r.kind !== 'single'
+        amount: it.amount, formula: r.formula, isFormula: r.kind !== 'single',
+        // Preserve agent ownership on edit — otherwise an edited agent
+        // line would lose its agentId and leak into Master views.
+        agentId: first.agentId || null
       };
     });
     // Splice back at the same position so voucher line order never moves.
@@ -889,6 +982,7 @@
       window.Sync3D.repushOnce(state, 'master'); /* push pre-sync local data once */
       window.Sync3D.syncNow(state, syncAfter, '').then(function () { renderSyncStatus(); render(); });
       window.Sync3D.startAutoSync(state, syncAfter, '', function () { renderSyncStatus(); render(); });
+      refreshAgentNames();
       renderSyncStatus('Login အိုကေ — sync နေ တယ်…');
     }).catch(function (e) {
       renderSyncStatus('Login မရ: ' + (e.message || e));
@@ -920,5 +1014,6 @@
     window.Sync3D.repushOnce(state, 'master'); /* push pre-sync local data once */
     window.Sync3D.syncNow(state, syncAfter, '').then(function () { renderSyncStatus(); render(); });
     window.Sync3D.startAutoSync(state, syncAfter, '', function () { renderSyncStatus(); render(); });
+    refreshAgentNames();
   }
 })();
