@@ -41,7 +41,7 @@
     <div class="boardbar"><span>Last: <b id="lastTotal">0</b></span><span><b id="boardCount">0</b> ကွက် · Total <b id="boardTotal">0</b></span></div>
     <div class="prev" id="preview" style="display:none"></div>
     <div class="bad" id="badbox" style="display:none"></div>
-    <div class="btnrow"><button class="btn gray" id="pasteBtn">Paste</button><button class="btn gray" id="scanBtn">စကန်</button><button class="btn gray" id="overBtn">အကျွံ</button><input type="file" id="scanFile" accept="image/*" style="display:none"><button class="btn" id="saveBtn" disabled>သိမ်းမည်</button></div>
+    <div class="btnrow"><button class="btn gray" id="scanBtn">စကန်</button><button class="btn gray" id="overBtn">အကျွံ</button><input type="file" id="scanFile" accept="image/*" style="display:none"><button class="btn" id="saveBtn" disabled>သိမ်းမည်</button></div>
     <div class="status" id="entryStatus"></div>
     <div class="kb" id="kb" style="display:none">
       <div class="krow">
@@ -135,23 +135,13 @@
   <!-- ဆက်တင် -->
   <section class="sec" id="sec-settings">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
-    <div class="setrow"><span>App Version</span><b>v30</b></div>
+    <div class="setrow"><span>App Version</span><b>v31</b></div>
     <div class="setrow"><span>App Reset</span><button class="danger" id="resetBtn">အကုန် ရှင်း</button></div>
   </section>
 
 </div>
 
 <!-- Limit dialog -->
-<div class="modal hidden" id="pasteModal">
-  <div class="mbox">
-    <h3>Paste</h3>
-    <textarea class="ta" id="pasteText" placeholder="ဒီမှာ ဖိနှိပ် paste လုပ်ပါ" style="min-height:90px"></textarea>
-    <div class="mrow">
-      <button class="sbtn gray" id="pasteCancel" style="flex:1">မလုပ်</button>
-      <button class="sbtn" id="pasteInsert" style="flex:1">ထည့်မည်</button>
-    </div>
-  </div>
-</div>
 <div class="modal hidden" id="limitModal">
   <div class="mbox">
     <h3>Limit</h3>
@@ -185,7 +175,7 @@
 </div>
 
 <script src="parser3d.js?v=15"></script>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 
 <div id="lineMenu" class="sheet" style="display:none">
   <div class="sheetCard">
