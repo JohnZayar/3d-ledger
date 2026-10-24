@@ -364,37 +364,6 @@
     });
   });
 
-  // Paste (fixed Oct 24 night, Pho: 'copy/paste ပြင်မှရမယ်'): Android Chrome
-  // usually denies clipboard.readText, so the old button dead-ended with
-  // 'Paste မရ'. Now: try readText first; on denial/empty, open a paste box
-  // (a normal textarea - long-press paste menu always works there).
-  function boardAppend(t) {
-    var b = $('board');
-    b.value = (b.value.trim() ? b.value.replace(/\n*$/, '\n') : '') + t;
-    parseBoard();
-  }
-  $('pasteBtn').addEventListener('click', function () {
-    function fallback() {
-      var pm = $('pasteModal');
-      if (!pm) { $('entryStatus').textContent = 'Paste မရ — လက်နဲ့ ထည့်ပါ'; return; }
-      $('pasteText').value = '';
-      pm.classList.remove('hidden');
-      setTimeout(function () { var pt = $('pasteText'); if (pt) pt.focus(); }, 50);
-    }
-    if (navigator.clipboard && navigator.clipboard.readText) {
-      navigator.clipboard.readText().then(function (t) {
-        if (t) { boardAppend(t); $('entryStatus').textContent = 'Paste ပြီး'; }
-        else fallback();
-      }, fallback);
-    } else fallback();
-  });
-  on('pasteCancel', 'click', function () { $('pasteModal').classList.add('hidden'); });
-  on('pasteInsert', 'click', function () {
-    var t = $('pasteText').value;
-    $('pasteModal').classList.add('hidden');
-    if (t && t.trim()) { boardAppend(t); $('entryStatus').textContent = 'Paste ပြီး'; }
-  });
-
   // In-app hedge transfer (Pho Oct 22): the clipboard round-trip
   // (copy over-limit text -> paste on the entry board) is blocked by
   // Chrome, so the excess lines go straight from app state to the board.
