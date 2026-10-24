@@ -1,4 +1,4 @@
-/* 3D Master v43 — local-first + server sync (sync3d). Agent privacy (Pho Oct 24): agent bettors never list in Master; agent records show only under the agent's name. */
+/* 3D Master v45 — local-first + server sync (sync3d). Agent privacy + Buyer/Agent management + automatic acks (Pho Oct 24, 2D-style: a save entering the ledger IS the acknowledgement). */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -37,6 +37,7 @@
   }
   var state = load() || seed();
   if (!state.agentNames) state.agentNames = {}; // code -> agent display name (3d_agents)
+  if (!state.ackedKeys) state.ackedKeys = {}; // ack key -> 1 (posted or seen on server)
   if (window.Sync3D) {
     try {
       window.Sync3D.init({ role: 'master', authKey: '3dMasterAuth', queueKey: '3dMasterQueue', metaKey: '3dMasterMeta' });
@@ -52,7 +53,7 @@
 
   /* ---------- sync wiring (Pho Oct 24) ---------- */
   function Q(op, coll, id, obj) { try { if (window.Sync3D) window.Sync3D.queue(op, coll, id, obj); } catch (e) {} }
-  function syncAfter() { save(); render(); refreshAgentNames(); }
+  function syncAfter() { save(); render(); refreshAgentNames(); autoAck(); }
   function syncStatusText() {
     if (!window.Sync3D) return 'Sync မရှိ';
     if (!window.Sync3D.isLoggedIn()) return 'Server မချိတ်သေး — အောက် login မှာ ဝင်ပါ';
@@ -137,6 +138,65 @@
         if (changed) { save(); render(); }
       })
       .catch(function () {});
+  }
+
+  /* ---------- acks (Pho Oct 24, 2D-style) ----------
+     AUTOMATIC, no button: when an agent's save enters Master's
+     ledger (it is in state after a pull), Master posts a 3d_acks
+     row so the Agent's voucher can show "ok". Ledger entry IS the
+     acknowledgement. Runs after every sync; already-acked saves
+     are never re-posted (server list + local set dedup). */
+  function ackKey(sid, aid, pid, bn) { return sid + '|' + aid + '|' + pid + '|' + bn; }
+  var ackRunning = false;
+  function pbListAll(coll, params) {
+    var out = [], page = 1;
+    function next() {
+      var p = Object.assign({}, params || {}, { page: page, perPage: 200 });
+      return pbList(coll, p).then(function (res) {
+        out = out.concat(res.items || []);
+        if (res.totalPages && page < res.totalPages) { page++; return next(); }
+        return out;
+      });
+    }
+    return next();
+  }
+  function autoAck() {
+    if (ackRunning) return;
+    if (!window.Sync3D || !window.Sync3D.isLoggedIn()) return;
+    var saves = {}, order = [];
+    state.records.forEach(function (r) {
+      if (!r.agentId) return;
+      var k = ackKey(r.sessionId, r.agentId, r.personId, r.batchNo);
+      if (!saves[k]) { saves[k] = { sessionId: r.sessionId, agentId: r.agentId, personId: r.personId, batchNo: r.batchNo }; order.push(k); }
+    });
+    if (!order.length) return;
+    ackRunning = true;
+    pbListAll('3d_acks', {}).then(function (items) {
+      var have = {};
+      items.forEach(function (it) {
+        var k = ackKey(it.sessionId, it.agentId, it.personId, it.batchNo);
+        have[k] = 1;
+        if (!state.ackedKeys[k]) state.ackedKeys[k] = 1;
+      });
+      var missing = order.filter(function (k) { return !have[k]; });
+      var chain = Promise.resolve(), posted = false;
+      missing.forEach(function (k) {
+        chain = chain.then(function () {
+          state.ackedKeys[k] = 1; // optimistic: blocks duplicate posts across overlapping syncs
+          var sv = saves[k];
+          var t = window.Sync3D.getTenant();
+          if (t && typeof t === 'object') t = t.id;
+          return pbReq('POST', '/collections/3d_acks/records', { tenant: t, sessionId: sv.sessionId, agentId: sv.agentId, personId: sv.personId, batchNo: sv.batchNo })
+            .then(function () { posted = true; })
+            .catch(function () { delete state.ackedKeys[k]; });
+        });
+      });
+      return chain.then(function () { return posted; });
+    }).then(function (posted) {
+      ackRunning = false;
+      save();
+      if (posted) render();
+    }).catch(function () { ackRunning = false; });
   }
   function sessRecords() {
     var sid = sess().id;
@@ -665,12 +725,23 @@
       var code = pid.slice(6);
       var arecs = sessRecords().filter(function (r) { return r.agentId === code; });
       if (!arecs.length) { box.innerHTML = '<div class="empty">စာရင်း မရှိသေး</div>'; return; }
-      var byLine = {}, order = [];
+      // Group by SAVE (person + batchNo), in first-seen order — one
+      // NO per save, so Master sees the same batches the Agent sees
+      // (and acks them per save). v43 grouped by lineId, which split
+      // a multi-line save into several NOs.
+      var bySave = {}, order = [];
       arecs.forEach(function (r) {
-        if (!byLine[r.lineId]) { byLine[r.lineId] = []; order.push(r.lineId); }
-        byLine[r.lineId].push(r);
+        var k = r.personId + '|' + r.batchNo;
+        if (!bySave[k]) { bySave[k] = { personId: r.personId, batchNo: r.batchNo, lines: {}, lineOrder: [] }; order.push(k); }
+        var sv = bySave[k];
+        if (!sv.lines[r.lineId]) { sv.lines[r.lineId] = []; sv.lineOrder.push(r.lineId); }
+        sv.lines[r.lineId].push(r);
       });
-      order.forEach(function (lid, i) { batches.push({ no: i + 1, lines: [byLine[lid]] }); });
+      order.forEach(function (k, i) {
+        var sv = bySave[k];
+        batches.push({ no: i + 1, lines: sv.lineOrder.map(function (lid) { return sv.lines[lid]; }),
+          ok: !!state.ackedKeys[ackKey(s.id, code, sv.personId, sv.batchNo)] });
+      });
     } else {
       var recs = sessRecords().filter(function (r) { return r.personId === pid; });
       if (!recs.length) { box.innerHTML = '<div class="empty">စာရင်း မရှိသေး</div>'; return; }
@@ -707,7 +778,7 @@
         body += '<tr id="' + xid + '" style="display:none"><td class="xpand" colspan="2"><div class="xgrid">' + chips + '</div></td></tr>';
       });
       body += '<tr class="vtot"><td colspan="2">Total ' + fmt(total) + '</td></tr>';
-      html += '<div class="vbatch"><div class="vhead">NO ' + b.no + '</div>' +
+      html += '<div class="vbatch"><div class="vhead">NO ' + b.no + (b.ok ? ' <span class="pos">ok</span>' : '') + '</div>' +
         '<table class="vt">' + body + '</table></div>';
     });
     box.innerHTML = html;
@@ -990,9 +1061,292 @@
   });
   on('serverLogoutBtn', 'click', function () {
     if (window.Sync3D) window.Sync3D.logout();
+    buyerListLoaded = false; currentAgentTenant = null; currentAgentShop = '';
     renderSyncStatus(); render();
   });
   on('syncNowBtn', 'click', syncNowUI);
+
+  /* ---------- buyers + agents (Pho only, mirrors 2D) ----------
+     Prerequisite: 3d_agents API rules carry a Pho-email exception
+     (like 2D users), otherwise cross-tenant creates/updates are
+     denied. Agent limit is a fixed 5 per buyer, counted from
+     3d_agents — no settings row needed. Direct PB calls (not the
+     sync queue): buyer/agent management is admin work, and the
+     queue only carries sessions/people/records. */
+  var PB_BASE = 'https://2d.skylinkvpn.stream/api';
+  function pbToken() {
+    try { var a = JSON.parse(localStorage.getItem('3dMasterAuth') || 'null'); return a && a.token; } catch (e) { return null; }
+  }
+  function pbReq(method, path, body) {
+    var tok = pbToken();
+    if (!tok) return Promise.reject(new Error('Server login မဝင်ရသေး'));
+    return fetch(PB_BASE + path, {
+      method: method,
+      headers: { Authorization: tok, 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (d) {
+        if (!res.ok) {
+          var m = (d && d.message) || ('error ' + res.status);
+          if (d && d.data) { try { m += ' | ' + JSON.stringify(d.data).slice(0, 200); } catch (e) {} }
+          throw new Error(m);
+        }
+        return d;
+      });
+    });
+  }
+  function pbList(coll, params) {
+    var q = Object.keys(params || {}).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
+    return pbReq('GET', '/collections/' + coll + '/records' + (q ? '?' + q : ''));
+  }
+  function isPho() {
+    if (!window.Sync3D || !window.Sync3D.isLoggedIn()) return false;
+    var u = window.Sync3D.getUser();
+    return !!(u && u.email === 'johnzyt7@gmail.com');
+  }
+  function randChars(chars, n) {
+    var out = '', rnd = new Uint8Array(n);
+    crypto.getRandomValues(rnd);
+    for (var i = 0; i < n; i++) out += chars[rnd[i] % chars.length];
+    return out;
+  }
+  function agent3dEmail(tid, n) { return 'agent3d_' + tid + '_' + n + '@3d.local'; }
+  function agent3dPass(tid, n, secret) { return 'Ag3D_' + tid + '_' + n + '_' + secret; }
+  function agent3dCode(tid, n, secret) { return tid + '-' + n + '-' + secret; }
+  function agentNumFromCode(code) {
+    var m = String(code || '').match(/^[^-]+-(\d+)-/);
+    return m ? parseInt(m[1], 10) : 0;
+  }
+  var buyerListLoaded = false, currentAgentTenant = null, currentAgentShop = '';
+  function renderBuyerSec() {
+    var sec = $('buyerSec'); if (!sec) return;
+    if (!isPho()) { sec.style.display = 'none'; return; }
+    sec.style.display = '';
+    if (!buyerListLoaded) { buyerListLoaded = true; renderBuyerList(); }
+  }
+  function buyerTenantOf(u) { return typeof u.tenant === 'string' ? u.tenant : (u.tenant && u.tenant.id); }
+  function renderBuyerList() {
+    var box = $('buyerList'); if (!box) return;
+    box.innerHTML = '<div class="status">တင်နေတယ်…</div>';
+    pbList('users', { perPage: 200 }).then(function (res) {
+      var buyers = (res.items || []).filter(function (u) {
+        var email = (u.email || '').toLowerCase();
+        var name = (u.name || '').trim();
+        if (email === 'johnzyt7@gmail.com') return false;
+        if (name.toLowerCase().indexOf('agent ') === 0) return false;
+        if (email.indexOf('agent3d_') === 0) return false;
+        return true;
+      });
+      if (!buyers.length) { box.innerHTML = '<div class="status">Buyer မရှိသေးပါ</div>'; return; }
+      var html = '';
+      buyers.forEach(function (b) {
+        var tid = buyerTenantOf(b) || '';
+        var dis = !!b.disabled;
+        html += '<div class="setrow"><span>' + esc(b.email) + ' · ' + esc(b.name || '') + '</span><span class="' + (dis ? 'neg' : 'pos') + '">' + (dis ? 'ပိတ်' : 'ဖွင့်') + '</span></div>' +
+          '<div class="btnrow"><button class="btn gray" data-buyer-agents="' + b.id + '" data-tenant="' + esc(tid) + '" data-shop="' + esc(b.name || '') + '">Agent များ</button>' +
+          '<button class="btn ' + (dis ? 'gray' : '') + '" data-buyer-toggle="' + b.id + '" data-disable="' + (dis ? '0' : '1') + '">' + (dis ? 'ဖွင့်' : 'ပိတ်') + '</button>' +
+          '<button class="btn gray" data-buyer-del="' + b.id + '" data-email="' + esc(b.email) + '">ဖျက်</button></div>';
+      });
+      box.innerHTML = html;
+      box.querySelectorAll('[data-buyer-agents]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          currentAgentTenant = btn.getAttribute('data-tenant');
+          currentAgentShop = btn.getAttribute('data-shop');
+          $('agentBuyerLabel').textContent = currentAgentShop ? ('— ' + currentAgentShop) : '';
+          renderAgentList();
+        });
+      });
+      box.querySelectorAll('[data-buyer-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          toggleBuyer(btn.getAttribute('data-buyer-toggle'), btn.getAttribute('data-disable') === '1');
+        });
+      });
+      box.querySelectorAll('[data-buyer-del]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          deleteBuyer(btn.getAttribute('data-buyer-del'), btn.getAttribute('data-email'));
+        });
+      });
+    }).catch(function (e) {
+      box.innerHTML = '<div class="status">မရဘူး: ' + esc(e.message || 'error') + '</div>';
+    });
+  }
+  function toggleBuyer(bid, disable) {
+    if (!confirm('ဒီ buyer ကို ' + (disable ? 'ပိတ်' : 'ဖွင့်') + 'မလား? (agent လည်း ' + (disable ? 'ပိတ်' : 'ဖွင့်') + 'မယ်)')) return;
+    pbReq('GET', '/collections/users/records/' + encodeURIComponent(bid)).then(function (buyer) {
+      var tid = buyerTenantOf(buyer);
+      return pbReq('PATCH', '/collections/users/records/' + encodeURIComponent(bid), { disabled: disable }).then(function () { return tid; });
+    }).then(function (tid) {
+      if (!tid) return;
+      var jobs = [];
+      jobs.push(pbList('users', { filter: 'email ~ "agent3d_' + tid + '_"', perPage: 100 }).then(function (res) {
+        return Promise.all((res.items || []).map(function (a) {
+          return pbReq('PATCH', '/collections/users/records/' + a.id, { disabled: disable }).catch(function () {});
+        }));
+      }).catch(function () {}));
+      jobs.push(pbList('3d_agents', { filter: 'tenant="' + tid + '"', perPage: 100 }).then(function (res) {
+        return Promise.all((res.items || []).map(function (a) {
+          return pbReq('PATCH', '/collections/3d_agents/records/' + a.id, { disabled: disable }).catch(function () {});
+        }));
+      }).catch(function () {}));
+      return Promise.all(jobs);
+    }).then(function () {
+      $('buyerStatus').textContent = disable ? 'ပိတ်ပြီးပြီ' : 'ဖွင့်ပြီးပြီ';
+      renderBuyerList();
+      if (currentAgentTenant) renderAgentList();
+    }).catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
+  }
+  function deleteBuyer(bid, email) {
+    if (!confirm('"' + email + '" ကို အပြီးဖျက်မလား? (agent တွေလည်း ပျက်မယ်, ပြန်မရဘူး)')) return;
+    if (!confirm('သေချာလား? နောက်ဆုံး အကြိမ် မေးတာ')) return;
+    pbReq('GET', '/collections/users/records/' + encodeURIComponent(bid)).then(function (buyer) {
+      var tid = buyerTenantOf(buyer);
+      var jobs = [];
+      if (tid) {
+        jobs.push(pbList('users', { filter: 'email ~ "agent3d_' + tid + '_"', perPage: 100 }).then(function (res) {
+          return Promise.all((res.items || []).map(function (a) {
+            return pbReq('DELETE', '/collections/users/records/' + a.id).catch(function () {});
+          }));
+        }).catch(function () {}));
+        jobs.push(pbList('3d_agents', { filter: 'tenant="' + tid + '"', perPage: 100 }).then(function (res) {
+          return Promise.all((res.items || []).map(function (a) {
+            return pbReq('DELETE', '/collections/3d_agents/records/' + a.id).catch(function () {});
+          }));
+        }).catch(function () {}));
+      }
+      return Promise.all(jobs);
+    }).then(function () {
+      return pbReq('DELETE', '/collections/users/records/' + encodeURIComponent(bid));
+    }).then(function () {
+      $('buyerStatus').textContent = 'ဖျက်ပြီးပြီ';
+      if (currentAgentTenant) { currentAgentTenant = null; $('agentList').innerHTML = ''; $('agentBuyerLabel').textContent = ''; }
+      renderBuyerList();
+    }).catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
+  }
+  function renderAgentList() {
+    var box = $('agentList'); if (!box) return;
+    if (!currentAgentTenant) { box.innerHTML = '<div class="status">Buyer စာရင်းက Agent များ ကို နှိပ်ပြီး buyer ရွေးပါ</div>'; return; }
+    box.innerHTML = '<div class="status">တင်နေတယ်…</div>';
+    pbList('3d_agents', { filter: 'tenant="' + currentAgentTenant + '"', perPage: 100 }).then(function (res) {
+      var items = res.items || [];
+      if (!items.length) { box.innerHTML = '<div class="status">Agent မရှိသေးပါ</div>'; return; }
+      var html = '';
+      items.forEach(function (a) {
+        var dis = !!a.disabled;
+        html += '<div class="setrow"><span>' + esc(a.name || '') + '</span><span class="' + (dis ? 'neg' : 'pos') + '">' + (dis ? 'ပိတ်' : 'ဖွင့်') + '</span></div>' +
+          '<div class="status">Code: <b>' + esc(a.code || '') + '</b></div>' +
+          '<div class="btnrow"><button class="btn ' + (dis ? 'gray' : '') + '" data-agent-toggle="' + a.id + '" data-disable="' + (dis ? '0' : '1') + '" data-code="' + esc(a.code || '') + '">' + (dis ? 'ဖွင့်' : 'ပိတ်') + '</button>' +
+          '<button class="btn gray" data-agent-del="' + a.id + '" data-code="' + esc(a.code || '') + '">ဖျက်</button></div>';
+      });
+      box.innerHTML = html;
+      box.querySelectorAll('[data-agent-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () { toggleAgent(btn.getAttribute('data-agent-toggle'), btn.getAttribute('data-code'), btn.getAttribute('data-disable') === '1'); });
+      });
+      box.querySelectorAll('[data-agent-del]').forEach(function (btn) {
+        btn.addEventListener('click', function () { deleteAgent(btn.getAttribute('data-agent-del'), btn.getAttribute('data-code')); });
+      });
+    }).catch(function (e) {
+      box.innerHTML = '<div class="status">မရဘူး: ' + esc(e.message || 'error') + '</div>';
+    });
+  }
+  function toggleAgent(aid, code, disable) {
+    if (!confirm('ဒီ agent ကို ' + (disable ? 'ပိတ်' : 'ဖွင့်') + 'မလား?')) return;
+    var n = agentNumFromCode(code);
+    var tid = currentAgentTenant;
+    pbReq('PATCH', '/collections/3d_agents/records/' + encodeURIComponent(aid), { disabled: disable }).then(function () {
+      if (tid && n) {
+        return pbList('users', { filter: 'email="' + agent3dEmail(tid, n) + '"', perPage: 5 }).then(function (res) {
+          var u = (res.items || [])[0];
+          if (u) return pbReq('PATCH', '/collections/users/records/' + u.id, { disabled: disable }).catch(function () {});
+        }).catch(function () {});
+      }
+    }).then(function () { renderAgentList(); renderBuyerList(); })
+    .catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
+  }
+  function deleteAgent(aid, code) {
+    if (!confirm('ဒီ agent (' + code + ') ကို အပြီးဖျက်မလား?')) return;
+    var n = agentNumFromCode(code);
+    var tid = currentAgentTenant;
+    var job = Promise.resolve();
+    if (tid && n) {
+      job = pbList('users', { filter: 'email="' + agent3dEmail(tid, n) + '"', perPage: 5 }).then(function (res) {
+        var u = (res.items || [])[0];
+        if (u) return pbReq('DELETE', '/collections/users/records/' + u.id).catch(function () {});
+      }).catch(function () {});
+    }
+    job.then(function () {
+      return pbReq('DELETE', '/collections/3d_agents/records/' + encodeURIComponent(aid));
+    }).then(function () {
+      $('buyerStatus').textContent = 'ဖျက်ပြီးပြီ';
+      renderAgentList();
+    }).catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
+  }
+  on('buyerRefreshBtn', 'click', renderBuyerList);
+  on('buyerCreateBtn', 'click', function () {
+    if (!isPho()) { $('buyerStatus').textContent = 'ခွင့်မရှိပါ'; return; }
+    var email = ($('buyerEmail').value || '').trim().toLowerCase();
+    var shop = ($('buyerShop').value || '').trim();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { $('buyerStatus').textContent = 'Email မှန်အောင်ရိုက်ပါ'; return; }
+    if (!shop) { $('buyerStatus').textContent = 'ဆိုင်နာမည် ရိုက်ပါ'; return; }
+    var btn = $('buyerCreateBtn'); btn.disabled = true; btn.textContent = 'လုပ်နေတယ်…';
+    var box = $('buyerResult'); box.style.display = 'none';
+    var tmp = randChars('ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789', 8);
+    var tenantId = null, agentCode = null;
+    pbReq('POST', '/collections/tenants/records', { name: shop }).then(function (t) {
+      tenantId = t.id;
+      return pbReq('POST', '/collections/users/records', { email: email, password: tmp, passwordConfirm: tmp, name: shop, tenant: tenantId });
+    }).then(function () {
+      var secret = randChars('ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789', 8);
+      agentCode = agent3dCode(tenantId, 1, secret);
+      var pass = agent3dPass(tenantId, 1, secret);
+      return pbReq('POST', '/collections/users/records', { email: agent3dEmail(tenantId, 1), password: pass, passwordConfirm: pass, name: 'Agent 1 (' + shop + ')', tenant: tenantId });
+    }).then(function () {
+      return pbReq('POST', '/collections/3d_agents/records', { tenant: tenantId, code: agentCode, name: 'Agent 1', disabled: false });
+    }).then(function () {
+      box.style.display = '';
+      box.innerHTML = '<div class="setrow"><span>Buyer account ရပြီ</span></div>' +
+        '<div>Email: <b>' + esc(email) + '</b></div>' +
+        '<div>Temp password: <b>' + esc(tmp) + '</b></div>' +
+        '<div class="status">Buyer ကို ပို့ပေးပါ — သူ Settings မှာ password ချိန်းရမယ်</div>' +
+        '<div>Agent 1 Code: <b>' + esc(agentCode) + '</b></div>' +
+        '<div class="status">ကူးယူထားပါ — temp password နောက်မှ ပြန်မရဘူး</div>';
+      $('buyerEmail').value = ''; $('buyerShop').value = '';
+      $('buyerStatus').textContent = 'Buyer ထုတ်ပြီးပြီ';
+      renderBuyerList();
+    }).catch(function (e) {
+      var msg = 'မရဘူး: ' + (e.message || 'error');
+      if (/already|exists|unique/i.test(e.message || '')) msg = 'ဒီ email ရှိနေပြီးသား';
+      $('buyerStatus').textContent = msg;
+    }).then(function () { btn.disabled = false; btn.textContent = 'Buyer အသစ် ဖန်တီး'; });
+  });
+  on('agentCreateBtn', 'click', function () {
+    if (!isPho()) { $('buyerStatus').textContent = 'ခွင့်မရှိပါ'; return; }
+    if (!currentAgentTenant) { $('buyerStatus').textContent = 'အရင် Buyer စာရင်းက Agent များ ကို နှိပ်ပါ'; return; }
+    var tid = currentAgentTenant;
+    var btn = $('agentCreateBtn'); btn.disabled = true; btn.textContent = 'လုပ်နေတယ်…';
+    var box = $('agentResult'); box.style.display = 'none';
+    pbList('3d_agents', { filter: 'tenant="' + tid + '"', perPage: 100 }).then(function (res) {
+      var items = res.items || [];
+      if (items.length >= 5) throw new Error('Agent 5 ဦးပြည့်နေပြီ');
+      var maxN = 0;
+      items.forEach(function (a) { var n = agentNumFromCode(a.code); if (n > maxN) maxN = n; });
+      var n = maxN + 1;
+      var name = ($('agentName').value || '').trim() || ('Agent ' + n);
+      var secret = randChars('ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789', 8);
+      var code = agent3dCode(tid, n, secret);
+      var pass = agent3dPass(tid, n, secret);
+      var userName = currentAgentShop ? (name + ' (' + currentAgentShop + ')') : name;
+      return pbReq('POST', '/collections/users/records', { email: agent3dEmail(tid, n), password: pass, passwordConfirm: pass, name: userName, tenant: tid }).then(function () {
+        return pbReq('POST', '/collections/3d_agents/records', { tenant: tid, code: code, name: name, disabled: false }).then(function () { return { code: code, name: name }; });
+      });
+    }).then(function (ag) {
+      box.style.display = '';
+      box.innerHTML = '<div>Agent ' + esc(ag.name) + ' Code: <b>' + esc(ag.code) + '</b></div><div class="status">ကူးယူထားပါ</div>';
+      $('agentName').value = '';
+      renderAgentList();
+    }).catch(function (e) {
+      $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error');
+    }).then(function () { btn.disabled = false; btn.textContent = 'Agent အသစ် ဖန်တီး'; });
+  });
 
   /* ---------- render all ---------- */
   function render() {
@@ -1006,6 +1360,7 @@
     renderOver();
     renderBlocked();
     renderCloseToggle();
+    renderBuyerSec();
     parseBoard();
     renderSyncStatus();
   }
