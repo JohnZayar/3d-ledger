@@ -24,7 +24,7 @@ body { background: #101114; color: #ececec; }
 
 /* home */
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-.tile { background: linear-gradient(180deg, #26262d, #1c1c21); border: 1px solid #37322a; border-top-color: #57492a; border-radius: 16px; padding: 15px 12px; text-align: center; font-size: 15.5px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04); }
+.tile { background: linear-gradient(180deg, #2e2b23, #1e1d20); border: 1px solid #49402c; border-top-color: #7d683a; border-radius: 16px; padding: 15px 12px; text-align: center; font-size: 15.5px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04); }
 .tile svg { width: 25px; height: 25px; stroke: #d9b83c; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .tile.gold { background: linear-gradient(150deg, #ecc95a, #c39b27); border-color: #8a6d1d; color: #17181c; box-shadow: 0 8px 20px rgba(201,162,39,.35); }
 .tile.gold svg { stroke: #17181c; }
