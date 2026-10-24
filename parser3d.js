@@ -187,6 +187,35 @@
       if (str.indexOf('///') === 0) return { nums: TRIPLES, len: 3, bareOk: true };
       mm = str.match(/^ထွိုင်ဆယ်ကွက်|^ထွိုင်|^အပူးစုံ/);
       if (mm) return { nums: TRIPLES, len: mm[0].length, bareOk: true };
+      // Pair covers (Pho, Oct 24): bare keyword = whole pair set (100
+      // numbers); digit + keyword = that pair digit only (10 numbers).
+      // နောက်ပူး = last two equal (XYY); ထိပ်ပူး / ရှေ့ပူး = first two equal (YYX).
+      // Triples (000,111,...,999) belong to both bare sets.
+      // နောက်ပူး 500 -> 50,000 | 5နောက်ပူး 500 -> 5,000 (055,155,...,955).
+      // NOTE: digit+ပူး must precede the positional branch, else "5နောက်"
+      // would misread as the 5နောက် positional cover (007...997).
+      mm = str.match(/^(\d)(နောက်ပူး|ထိပ်ပူး|ရှေ့ပူး)/);
+      if (mm) {
+        var pd = mm[1], outd = [], q;
+        if (mm[2] === 'နောက်ပူး') {
+          for (q = 0; q < 10; q++) outd.push(String(q) + pd + pd);
+        } else {
+          for (q = 0; q < 10; q++) outd.push(pd + pd + String(q));
+        }
+        return { nums: outd, len: mm[0].length, bareOk: true };
+      }
+      mm = str.match(/^(နောက်ပူး|ထိပ်ပူး|ရှေ့ပူး)/);
+      if (mm) {
+        var out3 = [], pa, pb;
+        if (mm[1] === 'နောက်ပူး') {
+          for (pa = 0; pa < 10; pa++) for (pb = 0; pb < 10; pb++)
+            out3.push(String(pa) + String(pb) + String(pb));
+        } else {
+          for (pa = 0; pa < 10; pa++) for (pb = 0; pb < 10; pb++)
+            out3.push(String(pa) + String(pa) + String(pb));
+        }
+        return { nums: out3, len: mm[0].length, bareOk: true };
+      }
       mm = str.match(/^(\d)(\d)\s*(ထိပ်|အလယ်|အလည်|နောက်)စီးရီး/);
       if (mm) {
         var a = mm[1], b = mm[2], out = [];
