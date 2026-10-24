@@ -1,4 +1,11 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v17 (Pho, Oct 24): ':' and '/' join the list-separator set
+ * (slash-lists only when NOT an any-digit form, which matchMember takes
+ * first; '/' is deliberately NOT in the chained-= follow set, so the
+ * =A/B slash-split tail keeps working; separator runs are same-char
+ * only, so a mixed run like ',/' still splits members instead of
+ * triggering the ellipsis tail rule); ရှေ့ (=ထိပ်) and လယ် (=အလယ်)
+ * are aliases in the series + positional branches.
  *
  * Pure function:
  *   parseLine(line) -> { ok, items: [{number, amount}], formula, count, total, kind }
@@ -216,11 +223,11 @@
         }
         return { nums: out3, len: mm[0].length, bareOk: true };
       }
-      mm = str.match(/^(\d)(\d)\s*(ထိပ်|အလယ်|အလည်|နောက်)စီးရီး/);
+      mm = str.match(/^(\d)(\d)\s*(ထိပ်|ရှေ့|အလယ်|အလည်|လယ်|နောက်)စီးရီး/);
       if (mm) {
         var a = mm[1], b = mm[2], out = [];
-        if (mm[3] === 'ထိပ်') { for (i = 0; i < 10; i++) out.push(String(i) + a + b); }
-        else if (mm[3] === 'အလယ်' || mm[3] === 'အလည်') { for (i = 0; i < 10; i++) out.push(a + String(i) + b); }
+        if (mm[3] === 'ထိပ်' || mm[3] === 'ရှေ့') { for (i = 0; i < 10; i++) out.push(String(i) + a + b); }
+        else if (mm[3] === 'အလယ်' || mm[3] === 'အလည်' || mm[3] === 'လယ်') { for (i = 0; i < 10; i++) out.push(a + String(i) + b); }
         else { for (i = 0; i < 10; i++) out.push(a + b + String(i)); }
         return { nums: out, len: mm[0].length, bareOk: true };
       }
@@ -235,10 +242,10 @@
       }
       // Positional covers (Pho, Oct 24): 4htate 500 / 7nauk500 / 3alel 600 -
       // one digit fixed in its position, the other two run free (100 numbers).
-      mm = str.match(/^(\d)(ထိပ်|နောက်|အလယ်|အလည်)(?!စီးရီး)/);
+      mm = str.match(/^(\d)(ထိပ်|ရှေ့|နောက်|အလယ်|အလည်|လယ်)(?!စီးရီး)/);
       if (mm) {
         var d = mm[1], out2 = [], x, y;
-        if (mm[2] === 'ထိပ်') { for (x = 0; x < 100; x++) out2.push(d + (x < 10 ? '0' : '') + x); }
+        if (mm[2] === 'ထိပ်' || mm[2] === 'ရှေ့') { for (x = 0; x < 100; x++) out2.push(d + (x < 10 ? '0' : '') + x); }
         else if (mm[2] === 'နောက်') { for (x = 0; x < 100; x++) out2.push((x < 10 ? '0' : '') + x + d); }
         else { for (x = 0; x < 10; x++) for (y = 0; y < 10; y++) out2.push(String(x) + d + String(y)); }
         return { nums: out2, len: mm[0].length, bareOk: true };
@@ -263,13 +270,13 @@
       // follows: exactly 3 digits, then a separator / '=' / dae keyword -
       // never a split marker (R r @ / kyan ar), which would mean price tail.
       if (ch === '=' && /^=\d{3}(?!\d)/.test(s.slice(pos)) && pos + 4 < s.length &&
-          '= -~,. *ဒ'.indexOf(s[pos + 4]) >= 0) {
+          '= -~,. *:ဒ'.indexOf(s[pos + 4]) >= 0) {
         lastSep = '='; pos++; continue;
       }
-      if (ch === '-' || ch === '~' || ch === ',' || ch === '.' || ch === '*') {
+      if (ch === '-' || ch === '~' || ch === ',' || ch === '.' || ch === '*' || ch === ':' || ch === '/') {
         lastSep = ch;
         var runStart = pos;
-        while (pos < s.length && '-~,. *'.indexOf(s[pos]) >= 0 && s[pos] !== ' ') pos++;
+        while (pos < s.length && s[pos] === ch) pos++;
         var runLen = pos - runStart;
         while (pos < s.length && s[pos] === ' ') pos++;
         if (pos >= s.length) return invalid(raw);
