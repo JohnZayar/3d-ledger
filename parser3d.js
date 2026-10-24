@@ -1,4 +1,7 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v19 (Pho, Oct 24): parenthesized / braced amounts — "123.456(500)",
+ * "123.456{500}", "345,769 543-211(150r100)" (bettors write amounts in
+ * brackets; plain 123.456.500 with no amount is NOT their writing).
  * Parser v18 (Pho, Oct 24, item 4): mixed-separator subjects + space
  * amount (+ R split) — "304. 863 346 1000 R 250" and siblings.
  * Parser v17 (Pho, Oct 24): ':' and '/' join the list-separator set
@@ -195,6 +198,19 @@
       rSM.head = subsM.length;
       return rSM;
     }
+    // Parenthesized / braced split amounts (Pho, Oct 24): the (d-new)
+    // form with the amount pair in brackets — "345,769 543-211(150r100)"
+    // = 4 straights @150 + 17 perms @100 (Rule B, cross-listed kept).
+    m = s.match(/^(\d{3}(?:[\s.,~\-:*/]+\d{3})+?)\s*(?:\(\s*|\{\s*)(\d+)\s*(?:ကျန်အာ|ကျန်|အာ|R|r|@|\/)\s*(\d+)\s*(?:\)|\})$/);
+    if (m) {
+      var subsP = m[1].split(/[\s.,~\-:*/]+/);
+      var sAP = parseInt(m[2], 10), oAP = parseInt(m[3], 10);
+      if (!(sAP > 0) || !(oAP > 0)) return invalid(raw);
+      var spP = splitItems(subsP, sAP, oAP);
+      var rSP = finishItems(spP.straights.concat(spP.kyans), raw, 'split');
+      rSP.head = subsP.length;
+      return rSP;
+    }
     // Space subjects, straight list: "567 765 15000".
     m = s.match(/^(\d{3}(?:\s+\d{3})+?)\s+(\d+)$/);
     if (m) {
@@ -212,6 +228,16 @@
       var sAN = parseInt(m[2], 10);
       if (!(sAN > 0)) return invalid(raw);
       return finish(subsN, sAN, raw, 'list');
+    }
+
+    // Parenthesized / braced straight amount (Pho, Oct 24): the (e-new)
+    // form with the amount in brackets — "123.456(500)", "123.456{500}".
+    m = s.match(/^(\d{3}(?:[\s.,~\-:*/]+\d{3})+?)\s*(?:\(\s*|\{\s*)(\d+)\s*(?:\)|\})$/);
+    if (m) {
+      var subsQ = m[1].split(/[\s.,~\-:*/]+/);
+      var sAQ = parseInt(m[2], 10);
+      if (!(sAQ > 0)) return invalid(raw);
+      return finish(subsQ, sAQ, raw, 'list');
     }
 
     // General member-list parser (Pho's symbol canon, Oct 22):
@@ -343,9 +369,19 @@
       if (!(bAmt > 0)) return invalid(raw);
       return finish(S, bAmt, raw, (members.length === 1 && members[0].nums.length === 1) ? 'single' : 'list');
     }
-    // Split tails: = A (marker) B, or a list + dae A ar B (Pho's ex. 4 form).
+    // Parenthesized / braced amount tail (Pho, Oct 24): 123(500),
+    // 123.456{500} — the amount wrapped in () or {}.
+    tm = rest.match(/^\s*(?:\(\s*|\{\s*)(\d+)\s*(?:\)|\})$/);
+    if (tm) {
+      var pAmt = parseInt(tm[1], 10);
+      if (!(pAmt > 0)) return invalid(raw);
+      return finish(S, pAmt, raw, (members.length === 1 && members[0].nums.length === 1) ? 'single' : 'list');
+    }
+    // Split tails: = A (marker) B, or a list + dae A ar B (Pho's ex. 4 form),
+    // or the amount pair in brackets: 123(150r100).
     tm = rest.match(/^\s*=\s*(\d+)\s*(?:ကျန်အာ|ကျန်|R|r|အာ|@|\/)\s*(\d+)$/) ||
-         rest.match(/^\s*ဒဲ့\s*(\d+)\s*(?:အာ|ကျန်)\s*(\d+)$/);
+         rest.match(/^\s*ဒဲ့\s*(\d+)\s*(?:အာ|ကျန်)\s*(\d+)$/) ||
+         rest.match(/^\s*(?:\(\s*|\{\s*)(\d+)\s*(?:ကျန်အာ|ကျန်|R|r|အာ|@|\/)\s*(\d+)\s*(?:\)|\})$/);
     if (tm) {
       var sAmt = parseInt(tm[1], 10), oAmt = parseInt(tm[2], 10);
       if (!(sAmt > 0) || !(oAmt > 0)) return invalid(raw);
