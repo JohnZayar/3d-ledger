@@ -1,4 +1,4 @@
-/* 3D Master — local prototype (localStorage only, no network). */
+/* 3D Master v40 — local-first + server sync (sync3d). */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -886,6 +886,7 @@
     renderSyncStatus('Login နေ တယ်…');
     window.Sync3D.login(em, pw).then(function () {
       $('serverPass').value = '';
+      window.Sync3D.repushOnce(state, 'master'); /* push pre-sync local data once */
       window.Sync3D.syncNow(state, syncAfter, '').then(function () { renderSyncStatus(); render(); });
       window.Sync3D.startAutoSync(state, syncAfter, '', function () { renderSyncStatus(); render(); });
       renderSyncStatus('Login အိုကေ — sync နေ တယ်…');
@@ -916,6 +917,7 @@
   }
   go('home');
   if (window.Sync3D && window.Sync3D.isLoggedIn()) {
+    window.Sync3D.repushOnce(state, 'master'); /* push pre-sync local data once */
     window.Sync3D.syncNow(state, syncAfter, '').then(function () { renderSyncStatus(); render(); });
     window.Sync3D.startAutoSync(state, syncAfter, '', function () { renderSyncStatus(); render(); });
   }
