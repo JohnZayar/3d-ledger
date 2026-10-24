@@ -13,7 +13,7 @@
     var p = function (n) { return String(n).padStart(2, '0'); };
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
   }
-  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function uid() { return window.Sync3D ? window.Sync3D.uid15() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)); }
   function nextDraw(fromISO) {
     // Same rounds as Master: draws on the 1st and 16th only.
     var d = new Date(fromISO + 'T00:00:00');
@@ -36,12 +36,37 @@
     } catch (e) { return null; }
   }
   var state = load() || seed();
+  if (window.Sync3D) {
+    try {
+      window.Sync3D.init({ role: 'agent', authKey: '3dAgentAuth', queueKey: '3dAgentQueue', metaKey: '3dAgentMeta' });
+      window.Sync3D.migrateState(state);
+    } catch (e) {}
+  }
   var memFallback = null;
   function save() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
     catch (e) { memFallback = JSON.stringify(state); }
   }
   save();
+
+  /* ---------- sync wiring (Pho Oct 24; Agent pushes people+records only) ---------- */
+  function Q(op, coll, id, obj) { try { if (window.Sync3D) window.Sync3D.queue(op, coll, id, obj); } catch (e) {} }
+  function syncAfter() { save(); render(); }
+  function syncStatusText() {
+    if (!window.Sync3D) return 'Sync မရှိ';
+    if (!window.Sync3D.isLoggedIn()) return 'Server မချိတ်သေး (local ပဲ သိမ်းမယ်)';
+    var q = window.Sync3D.queueCount();
+    var err = window.Sync3D.getLastPushError() || window.Sync3D.getLastPullError();
+    return err ? ('Sync အမှား: ' + err) : (q ? ('တင်ကျန် ' + q + ' ခု') : 'Sync အိုကေ');
+  }
+  function renderSyncStatus(msg) {
+    var el = $('syncStatus'); if (el) el.textContent = msg || syncStatusText();
+  }
+  function syncNowUI() {
+    if (!window.Sync3D || !window.Sync3D.isLoggedIn()) { renderSyncStatus(); return; }
+    renderSyncStatus('Sync နေ တယ်…');
+    window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function () { renderSyncStatus(); render(); });
+  }
 
   /* ---------- helpers ---------- */
   function $(id) { return document.getElementById(id); }
@@ -92,7 +117,25 @@
   on('loginBtn', 'click', function () {
     var code = $('agentCode').value.trim();
     if (!code) { $('loginStatus').textContent = 'Agent code ထည့်ပါ'; return; }
-    state.agentCode = code; save(); go('home');
+    if (!window.Sync3D) { state.agentCode = code; save(); go('home'); return; }
+    var creds = window.Sync3D.codeToCreds(code);
+    if (!creds) { state.agentCode = code; save(); go('home'); return; } // test code: local-only (v1)
+    $('loginStatus').textContent = 'Login နေ တယ်…';
+    window.Sync3D.login(creds.email, creds.password).then(function () {
+      return window.Sync3D.checkAgentDisabled(code);
+    }).then(function (disabled) {
+      if (disabled) {
+        window.Sync3D.logout();
+        $('loginStatus').textContent = 'ဒီ code ပိတ်ထားသည်';
+        return;
+      }
+      state.agentCode = code; save(); go('home');
+      window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function () { renderSyncStatus(); render(); });
+      window.Sync3D.startAutoSync(state, syncAfter, state.agentCode, function () { renderSyncStatus(); render(); });
+    }).catch(function () {
+      // offline / wrong code: stay local-only, retry at next open
+      state.agentCode = code; save(); go('home');
+    });
   });
 
   /* ---------- sessions ---------- */
@@ -174,7 +217,9 @@
     }
     var pcEl = $('pClosed');
     var closedLimit = (pcEl && pcEl.value.trim() !== '') ? Number(normNum(pcEl.value)) : null;
-    state.people.push({ id: uid(), name: name, payout: payout, tote: tote, commission: Number(normNum($('pComm').value)), role: 'bettor', closedLimit: closedLimit });
+    var np = { id: uid(), name: name, payout: payout, tote: tote, commission: Number(normNum($('pComm').value)), role: 'bettor', closedLimit: closedLimit, agentId: state.agentCode || null };
+    state.people.push(np);
+    Q('create', '3d_people', np.id, np);
     $('pName').value = ''; $('pPayout').value = ''; $('pComm').value = ''; if (pcEl) pcEl.value = '';
     $('peopleStatus').textContent = '';
     save(); render();
@@ -272,6 +317,30 @@
   function winLocked() { var s = sess(); return !!(s && (s.winning || s.closed)); }
   function lockPrefix() { var s = sess(); return (s && s.winning) ? 'ပေါက်သီး ထည့်ပြီး' : 'ပွဲစဉ် ပိတ်ထားသည်'; }
 
+  function closedViolation(pid, items, excludeLineId) {
+    var p = person(pid);
+    if (!p || p.closedLimit == null) return null;
+    var list = sess().blocked || [];
+    if (!list.length) return null;
+    var sums = {};
+    (items || []).forEach(function (it) {
+      if (list.indexOf(it.number) >= 0) sums[it.number] = (sums[it.number] || 0) + it.amount;
+    });
+    if (!Object.keys(sums).length) return null;
+    var existing = {};
+    sessRecords().forEach(function (r) {
+      if (r.personId !== pid) return;
+      if (excludeLineId && r.lineId === excludeLineId) return;
+      if (list.indexOf(r.number) >= 0) existing[r.number] = (existing[r.number] || 0) + r.amount;
+    });
+    var bad = null;
+    Object.keys(sums).forEach(function (n) {
+      var tot = (existing[n] || 0) + sums[n];
+      if (tot > p.closedLimit && !bad) bad = { n: n, cap: p.closedLimit, tot: tot };
+    });
+    return bad;
+  }
+
   $('saveBtn').addEventListener('click', function () {
     if (winLocked()) { $('entryStatus').textContent = lockPrefix() + ' — ထိုး မရတော့ပါ'; return; }
     var pid = $('entryPerson').value;
@@ -279,6 +348,14 @@
     var valid = lastParse.filter(function (r) { return r.ok; });
     if (!valid.length) return;
     var s = sess();
+    var newItems = [];
+    valid.forEach(function (r) { r.items.forEach(function (it) { newItems.push(it); }); });
+    var badC = closedViolation(pid, newItems, null);
+    if (badC) {
+      $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + badC.n + ' — ' + person(pid).name +
+        ' limit ' + fmt(badC.cap) + ' ကျော် နေတယ် (' + fmt(badC.tot) + ' ဖက် နေ)';
+      return;
+    }
     var batchNo = 1;
     sessRecords().forEach(function (r) {
       if (r.personId === pid && r.batchNo >= batchNo) batchNo = r.batchNo + 1;
@@ -286,11 +363,13 @@
     valid.forEach(function (r) {
       var lineId = uid();
       r.items.forEach(function (it) {
-        state.records.push({
+        var rec = {
           id: uid(), sessionId: s.id, personId: pid, batchNo: batchNo,
           lineId: lineId, number: it.number, amount: it.amount,
-          formula: r.formula, isFormula: r.kind !== 'single'
-        });
+          formula: r.formula, isFormula: r.kind !== 'single', agentId: state.agentCode || null
+        };
+        state.records.push(rec);
+        Q('create', '3d_records', rec.id, rec);
       });
     });
     // Only saved lines leave the board — invalid lines STAY to be fixed.
@@ -398,6 +477,7 @@
     var recs = lineRecsOf(menuLineId);
     if (!recs.length) return closeLineMenu();
     if (!confirm('ဒီ လိုင်း ဖျက် မလား? ' + recs[0].formula)) return;
+    recs.forEach(function (r) { Q('delete', '3d_records', r.id, null); });
     state.records = state.records.filter(function (r) { return r.lineId !== menuLineId; });
     save(); render(); closeLineMenu();
   });
@@ -426,6 +506,8 @@
     if (!recs.length) return closeLineMenu();
     var r = window.Parser3D.parseLine($('lmInput').value);
     if (!r.ok) { $('lmHint').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
+    var badL = closedViolation(recs[0].personId, r.items, menuLineId);
+    if (badL) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badL.n + ' limit ' + fmt(badL.cap) + ' ကျော် နေတယ်'; return; }
     var first = recs[0];
     var idx = state.records.indexOf(first);
     state.records = state.records.filter(function (x) { return x.lineId !== menuLineId; });
@@ -434,9 +516,11 @@
       return {
         id: uid(), sessionId: first.sessionId, personId: first.personId,
         batchNo: first.batchNo, lineId: newLineId, number: it.number,
-        amount: it.amount, formula: r.formula, isFormula: r.kind !== 'single'
+        amount: it.amount, formula: r.formula, isFormula: r.kind !== 'single', agentId: state.agentCode || null
       };
     });
+    recs.forEach(function (r0) { Q('delete', '3d_records', r0.id, null); });
+    newRecs.forEach(function (rec) { Q('create', '3d_records', rec.id, rec); });
     newRecs.forEach(function (rec, i) { state.records.splice(idx + i, 0, rec); });
     save(); render(); closeLineMenu();
   });
@@ -459,6 +543,8 @@
     var p = person(menuPersonId); if (!p) return closePersonMenu();
     var n = state.records.filter(function (r) { return r.personId === p.id; }).length;
     if (!confirm('ဒီ လူ ဖျက် မလား? ' + p.name + (n ? ' — စာရင်း ' + n + ' ကွက် ပါ ပျက် မယ်' : ''))) return;
+    state.records.filter(function (r) { return r.personId === p.id; }).forEach(function (r) { Q('delete', '3d_records', r.id, null); });
+    Q('delete', '3d_people', p.id, null);
     state.people = state.people.filter(function (x) { return x.id !== p.id; });
     state.records = state.records.filter(function (r) { return r.personId !== p.id; });
     save(); render(); closePersonMenu();
@@ -497,6 +583,7 @@
     var pcv = $('pmClosed').value.trim();
     var cl = Number(normNum(pcv));
     p.closedLimit = (pcv === '' || isNaN(cl)) ? null : cl;
+    Q('update', '3d_people', p.id, p);
     save(); render(); closePersonMenu();
   });
 
@@ -546,9 +633,13 @@
   }
 
   /* ---------- settings ---------- */
+  on('syncNowBtn', 'click', syncNowUI);
   $('resetBtn').addEventListener('click', function () {
     if (!confirm('အကုန် ရှင်းမလား?')) return;
     localStorage.removeItem(LS_KEY);
+    localStorage.removeItem('3dAgentQueue');
+    localStorage.removeItem('3dAgentAuth');
+    localStorage.removeItem('3dAgentMeta');
     location.reload();
   });
 
@@ -560,6 +651,18 @@
     renderDaily();
     renderVoucher();
     parseBoard();
+    renderSyncStatus();
   }
-  if (state.agentCode) go('home'); else go('login');
+  if (state.agentCode) {
+    go('home');
+    if (window.Sync3D) {
+      var creds0 = window.Sync3D.codeToCreds(state.agentCode);
+      if (creds0) {
+        window.Sync3D.login(creds0.email, creds0.password).then(function () {
+          window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function () { renderSyncStatus(); render(); });
+          window.Sync3D.startAutoSync(state, syncAfter, state.agentCode, function () { renderSyncStatus(); render(); });
+        }).catch(function () { renderSyncStatus(); });
+      }
+    }
+  } else go('login');
 })();
