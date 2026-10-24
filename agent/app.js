@@ -1,4 +1,4 @@
-/* 3D Agent v1 — local-first (server sync lands next).
+/* 3D Agent v3 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
    No ledger / winning / over-limit / blocked screens — those are Master's.
    People here are bettors only; Master owns အကန်ဒိုင်. */
@@ -130,6 +130,7 @@
         return;
       }
       state.agentCode = code; save(); go('home');
+      window.Sync3D.repushOnce(state, 'agent'); /* push pre-sync local data once */
       window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function () { renderSyncStatus(); render(); });
       window.Sync3D.startAutoSync(state, syncAfter, state.agentCode, function () { renderSyncStatus(); render(); });
     }).catch(function () {
@@ -659,6 +660,7 @@
       var creds0 = window.Sync3D.codeToCreds(state.agentCode);
       if (creds0) {
         window.Sync3D.login(creds0.email, creds0.password).then(function () {
+          window.Sync3D.repushOnce(state, 'agent'); /* push pre-sync local data once */
           window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function () { renderSyncStatus(); render(); });
           window.Sync3D.startAutoSync(state, syncAfter, state.agentCode, function () { renderSyncStatus(); render(); });
         }).catch(function () { renderSyncStatus(); });
