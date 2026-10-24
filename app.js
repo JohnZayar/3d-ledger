@@ -1,4 +1,4 @@
-/* 3D Master v47 — local-first + server sync (sync3d). Agent privacy + Buyer management + automatic acks + buyer self-service agents (Pho Oct 24, 2D-exact: Pho does NOT see buyers' agent lists — buyers manage their own agents; Pho: create buyers, raise limits, disable/delete only). */
+/* 3D Master v48 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -53,7 +53,7 @@
 
   /* ---------- sync wiring (Pho Oct 24) ---------- */
   function Q(op, coll, id, obj) { try { if (window.Sync3D) window.Sync3D.queue(op, coll, id, obj); } catch (e) {} }
-  function syncAfter() { save(); render(); refreshAgentNames(); autoAck(); }
+  function syncAfter() { save(); render(); refreshAgentNames(); if (ensureAgentPeople()) { save(); render(); } autoAck(); }
   function syncStatusText() {
     if (!window.Sync3D) return 'Sync မရှိ';
     if (!window.Sync3D.isLoggedIn()) return 'Server မချိတ်သေး — အောက် login မှာ ဝင်ပါ';
@@ -99,6 +99,10 @@
      math only and are never rendered. */
   function isAgentPerson(p) { return !!(p && p.agentId); }
   function visiblePeople() { return state.people.filter(function (p) { return !isAgentPerson(p); }); }
+  // လူစာရင်း screen: Master's own people PLUS agent-registry rows
+  // (role 'agent', tagged) — agent bettors stay hidden. Entry and
+  // voucher dropdowns keep using visiblePeople() (no registry rows).
+  function listPeople() { return state.people.filter(function (p) { return !p.agentId || p.role === 'agent'; }); }
   function agentName(code) {
     if (state.agentNames && state.agentNames[code]) return state.agentNames[code];
     var m = String(code || '').match(/^[^-]+-(\d+)-/);
@@ -120,6 +124,31 @@
   // PocketBase as sync3d). Throttled; failures are silent and the
   // code-derived "Agent N" fallback still renders.
   var lastAgentNamesFetch = 0;
+  var agentRecords = [];
+  // Agent registry (Pho Oct 24): one person row per agent code, so
+  // Master can set that agent's terms (payout/tote/commission/
+  // closedLimit). Rows live in 3d_people with role 'agent' and are
+  // shown in Master's လူစာရင်း (tagged) but never in entry
+  // dropdowns and never in the Agent app's bettor lists. Terms
+  // unset (payout 0) = fall back to per-bettor math; deleting a
+  // row only resets terms (auto-create re-adds it blank). The
+  // agent ACCOUNT itself is never touched here.
+  function agentPersonFor(code) { return state.people.find(function (p) { return p.role === 'agent' && p.agentId === code; }); }
+  function ensureAgentPeople() {
+    if (!window.Sync3D || !window.Sync3D.isLoggedIn()) return 0;
+    var myTenant = ownTenant();
+    var created = 0;
+    (agentRecords || []).forEach(function (it) {
+      var tid = (typeof it.tenant === 'string') ? it.tenant : (it.tenant && it.tenant.id);
+      if (myTenant && tid && tid !== myTenant) return; // Pho-exception fetch may include other tenants
+      if (agentPersonFor(it.code)) return;
+      var np = { id: uid(), name: it.name || agentName(it.code), role: 'agent', payout: 0, tote: 0, commission: 0, closedLimit: null, agentId: it.code };
+      state.people.push(np);
+      Q('create', '3d_people', np.id, np);
+      created++;
+    });
+    return created;
+  }
   function refreshAgentNames() {
     if (!window.Sync3D || !window.Sync3D.isLoggedIn()) return;
     var now = Date.now();
@@ -132,10 +161,12 @@
       .then(function (res) { return res.json(); })
       .then(function (d) {
         var map = {};
-        (d.items || []).forEach(function (it) { if (it.code) map[it.code] = it.name || ''; });
+        agentRecords = [];
+        (d.items || []).forEach(function (it) { if (it.code) { map[it.code] = it.name || ''; agentRecords.push(it); } });
         var changed = JSON.stringify(map) !== JSON.stringify(state.agentNames || {});
         state.agentNames = map;
-        if (changed) { save(); render(); }
+        var created = ensureAgentPeople();
+        if (changed || created) { save(); render(); }
       })
       .catch(function () {});
   }
@@ -293,9 +324,10 @@
     restoreSel(ep, keepE);
     vp.innerHTML = (vis.length || agentOpts) ? (opts + agentOpts) : '<option value="">—</option>';
     restoreSel(vp, keepV);
-    // list
-    $('peopleList').innerHTML = vis.map(function (p) {
-      return '<div class="prow" data-pid="' + p.id + '">' + (p.role === 'akan' ? '<span class="tag">အကန်</span>' : '') + '<span class="nm">' + esc(p.name) + '</span>' +
+    // list (registry rows included, tagged; agent bettors excluded)
+    var listVis = listPeople();
+    $('peopleList').innerHTML = listVis.map(function (p) {
+      return '<div class="prow" data-pid="' + p.id + '">' + (p.role === 'akan' ? '<span class="tag">အကန်</span>' : '') + (p.role === 'agent' ? '<span class="tag">Agent</span>' : '') + '<span class="nm">' + esc(p.name) + '</span>' +
         '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '-' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' + (p.closedLimit != null ? '<span>ပိတ် ' + esc(fmt(p.closedLimit)) + '</span>' : '') + '</div>';
     }).join('');
     // Long-press a row (Pho Oct 22): edit / delete menu, same pattern
@@ -678,15 +710,19 @@
       var net = p.role === 'akan'
         ? -d.bet * (1 - p.commission / 100) + pay
         : d.bet * (1 - p.commission / 100) - pay;
-      T.bet += d.bet; T.win += d.win; T.tote += d.tote; T.net += net;
+      T.bet += d.bet; T.win += d.win; T.tote += d.tote;
       if (isAgentPerson(p)) {
         // Agent bettors roll up under the agent's name ONLY (privacy
-        // rule) — their names and rates never render.
-        if (!agentAgg[p.agentId]) { agentAgg[p.agentId] = { bet: 0, win: 0, tote: 0, net: 0 }; agentOrder.push(p.agentId); }
+        // rule) — their names and rates never render. The agent
+        // row's net is settled at the AGENT's Master-set terms
+        // below, not at bettor rates (bettorNet is only the
+        // fallback until terms are set).
+        if (!agentAgg[p.agentId]) { agentAgg[p.agentId] = { bet: 0, win: 0, tote: 0, bettorNet: 0, net: 0 }; agentOrder.push(p.agentId); }
         var a = agentAgg[p.agentId];
-        a.bet += d.bet; a.win += d.win; a.tote += d.tote; a.net += net;
+        a.bet += d.bet; a.win += d.win; a.tote += d.tote; a.bettorNet += net;
         return;
       }
+      T.net += net;
       var nc = net < 0 ? 'neg' : (net > 0 ? 'pos' : '');
       rows += '<tr><td>' + (p.role === 'akan' ? '<span class="tag">အကန်</span> ' : '') + esc(p.name) + '</td><td>' + fmt(d.bet) + '</td><td>' + fmt(d.win) +
         '</td><td>' + fmt(d.tote) +
@@ -694,6 +730,13 @@
     });
     agentOrder.forEach(function (code) {
       var a = agentAgg[code];
+      // Master-set agent terms (Pho Oct 24): if Master registered
+      // this agent with terms (payout > 0), settle the whole agent
+      // total at those terms; otherwise fall back to bettor math.
+      var ap = agentPersonFor(code);
+      if (ap && ap.payout > 0) a.net = a.bet * (1 - ap.commission / 100) - a.win * ap.payout - a.tote * (ap.tote || 0);
+      else a.net = a.bettorNet;
+      T.net += a.net;
       var nc = a.net < 0 ? 'neg' : (a.net > 0 ? 'pos' : '');
       rows += '<tr><td>' + esc(agentLabel(code)) + '</td><td>' + fmt(a.bet) + '</td><td>' + fmt(a.win) +
         '</td><td>' + fmt(a.tote) +
@@ -856,6 +899,8 @@
     var r = window.Parser3D.parseLine($('lmInput').value);
     if (!r.ok) { $('lmHint').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
     var badL = closedViolation(recs[0].personId, r.items, menuLineId);
+    var badA = recs[0].agentId ? agentClosedViolation(recs[0].agentId, r.items, menuLineId) : null;
+    if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' limit ' + fmt(badA.cap) + ' ကျော် နေတယ် (Agent စုစုပေါင်း)'; return; }
     if (badL) { $('lmHint').textContent = '\u1015\u102d\u1010\u103a\u1002\u100f\u1014\u103a\u1038 ' + badL.n + ' limit ' + fmt(badL.cap) + ' \u1000\u103b\u1031\u102c\u103a \u1019\u101a\u103a'; return; }
     var first = recs[0];
     var idx = state.records.indexOf(first);
@@ -932,7 +977,7 @@
       $('pmHint').textContent = '\u1021\u1019\u100a\u103a / \u1021\u1006 / \u1000\u1031\u102c\u103a \u1021\u1000\u102f\u1014\u103a \u1016\u103c\u100a\u1037\u203a\u1015\u102b';
       return;
     }
-    p.name = name; p.role = $('pmRole').value; p.payout = payout; p.tote = tote;
+    p.name = name; p.role = (p.role === 'agent' ? 'agent' : $('pmRole').value); p.payout = payout; p.tote = tote;
     p.commission = Number(normNum(commRaw));
     var pcv = $('pmClosed').value.trim();
     var cl = Number(normNum(pcv));
@@ -992,6 +1037,32 @@
     Object.keys(sums).forEach(function (n) {
       var tot = (existing[n] || 0) + sums[n];
       if (tot > p.closedLimit && !bad) bad = { n: n, cap: p.closedLimit, tot: tot };
+    });
+    return bad;
+  }
+  // Agent aggregate hot-limit (Pho Oct 24): the agent-person's
+  // closedLimit caps the AGENT's total for blocked-list numbers
+  // across all its bettors in the session (not per bettor).
+  function agentClosedViolation(code, items, excludeLineId) {
+    var ap = agentPersonFor(code);
+    if (!ap || ap.closedLimit == null) return null;
+    var list = sess().blocked || [];
+    if (!list.length) return null;
+    var sums = {};
+    (items || []).forEach(function (it) {
+      if (list.indexOf(it.number) >= 0) sums[it.number] = (sums[it.number] || 0) + it.amount;
+    });
+    if (!Object.keys(sums).length) return null;
+    var existing = {};
+    sessRecords().forEach(function (r) {
+      if (r.agentId !== code) return;
+      if (excludeLineId && r.lineId === excludeLineId) return;
+      if (list.indexOf(r.number) >= 0) existing[r.number] = (existing[r.number] || 0) + r.amount;
+    });
+    var bad = null;
+    Object.keys(sums).forEach(function (n) {
+      var tot = (existing[n] || 0) + sums[n];
+      if (tot > ap.closedLimit && !bad) bad = { n: n, cap: ap.closedLimit, tot: tot };
     });
     return bad;
   }
