@@ -11,7 +11,7 @@
     var p = function (n) { return String(n).padStart(2, '0'); };
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
   }
-  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function uid() { return window.Sync3D ? window.Sync3D.uid15() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)); }
 
   function nextDraw(fromISO) {
     // 3D draws on the 1st and 16th — next draw date >= fromISO (a round
@@ -36,12 +36,37 @@
     } catch (e) { return null; }
   }
   var state = load() || seed();
+  if (window.Sync3D) {
+    try {
+      window.Sync3D.init({ role: 'master', authKey: '3dMasterAuth', queueKey: '3dMasterQueue', metaKey: '3dMasterMeta' });
+      window.Sync3D.migrateState(state);
+    } catch (e) {}
+  }
   var memFallback = null;
   function save() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
     catch (e) { memFallback = JSON.stringify(state); }
   }
   save();
+
+  /* ---------- sync wiring (Pho Oct 24) ---------- */
+  function Q(op, coll, id, obj) { try { if (window.Sync3D) window.Sync3D.queue(op, coll, id, obj); } catch (e) {} }
+  function syncAfter() { save(); render(); }
+  function syncStatusText() {
+    if (!window.Sync3D) return 'Sync မရှိ';
+    if (!window.Sync3D.isLoggedIn()) return 'Server မချိတ်သေး — အောက် login မှာ ဝင်ပါ';
+    var q = window.Sync3D.queueCount();
+    var err = window.Sync3D.getLastPushError() || window.Sync3D.getLastPullError();
+    return err ? ('Sync အမှား: ' + err) : (q ? ('တင်ကျန် ' + q + ' ခု') : 'Sync အိုကေ');
+  }
+  function renderSyncStatus(msg) {
+    var el = $('syncStatus'); if (el) el.textContent = msg || syncStatusText();
+  }
+  function syncNowUI() {
+    if (!window.Sync3D || !window.Sync3D.isLoggedIn()) { renderSyncStatus(); return; }
+    renderSyncStatus('Sync နေ တယ်…');
+    window.Sync3D.syncNow(state, syncAfter, '').then(function () { renderSyncStatus(); render(); });
+  }
 
   /* ---------- helpers ---------- */
   function $(id) { return document.getElementById(id); }
@@ -125,6 +150,7 @@
     else {
       var s = { id: uid(), date: nd, limit: 50000, winning: null, closed: false };
       state.sessions.push(s);
+      Q('create', '3d_sessions', s.id, s);
       state.sessions.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
       state.currentSessionId = s.id;
     }
@@ -190,7 +216,9 @@
     }
     var pcEl = $('pClosed');
     var closedLimit = (pcEl && pcEl.value.trim() !== '') ? Number(normNum(pcEl.value)) : null;
-    state.people.push({ id: uid(), name: name, payout: payout, tote: tote, commission: comm, role: $('pRole').value, closedLimit: closedLimit });
+    var np = { id: uid(), name: name, payout: payout, tote: tote, commission: comm, role: $('pRole').value, closedLimit: closedLimit };
+    state.people.push(np);
+    Q('create', '3d_people', np.id, np);
     $('pName').value = ''; $('pPayout').value = ''; $('pComm').value = ''; if (pcEl) pcEl.value = '';
     $('peopleStatus').textContent = '';
     save(); render();
@@ -389,7 +417,7 @@
   }
   on('closeToggle', 'click', function () {
     var s = sess(); if (!s) return;
-    s.closed = !s.closed; save(); renderCloseToggle(); render();
+    s.closed = !s.closed; Q('update', '3d_sessions', s.id, s); save(); renderCloseToggle(); render();
   });
 
   $('saveBtn').addEventListener('click', function () {
@@ -414,11 +442,13 @@
     valid.forEach(function (r) {
       var lineId = uid();
       r.items.forEach(function (it) {
-        state.records.push({
+        var rec = {
           id: uid(), sessionId: s.id, personId: pid, batchNo: batchNo,
           lineId: lineId, number: it.number, amount: it.amount,
           formula: r.formula, isFormula: r.kind !== 'single'
-        });
+        };
+        state.records.push(rec);
+        Q('create', '3d_records', rec.id, rec);
       });
     });
     // Pho Oct 22: only the saved (green) lines leave the board —
@@ -485,7 +515,7 @@
   $('limitCancel').addEventListener('click', function () { $('limitModal').classList.add('hidden'); });
   $('limitSave').addEventListener('click', function () {
     var v = Number($('limitInput').value);
-    if (v > 0) { sess().limit = v; save(); }
+    if (v > 0) { sess().limit = v; Q('update', '3d_sessions', sess().id, sess()); save(); }
     $('limitModal').classList.add('hidden');
     render();
   });
@@ -494,7 +524,7 @@
   $('winBtn').addEventListener('click', function () {
     var v = normNum($('winInput').value.trim());
     if (!/^\d{3}$/.test(v)) { $('winStatus').textContent = 'ဂဏန်း ၃ လုံး ထည့်ပါ'; return; }
-    sess().winning = v; save();
+    sess().winning = v; Q('update', '3d_sessions', sess().id, sess()); save();
     $('winStatus').textContent = 'ပေါက်သီး ' + v;
     render();
   });
@@ -635,6 +665,7 @@
     var recs = lineRecsOf(menuLineId);
     if (!recs.length) return closeLineMenu();
     if (!confirm('ဒီ လိုင်း ဖျက် မလား? ' + recs[0].formula)) return;
+    recs.forEach(function (r) { Q('delete', '3d_records', r.id, null); });
     state.records = state.records.filter(function (r) { return r.lineId !== menuLineId; });
     save(); render(); closeLineMenu();
   });
@@ -677,6 +708,8 @@
       };
     });
     // Splice back at the same position so voucher line order never moves.
+    recs.forEach(function (r) { Q('delete', '3d_records', r.id, null); });
+    newRecs.forEach(function (rec) { Q('create', '3d_records', rec.id, rec); });
     newRecs.forEach(function (rec, i) { state.records.splice(idx + i, 0, rec); });
     save(); render(); closeLineMenu();
   });
@@ -699,6 +732,8 @@
     var p = person(menuPersonId); if (!p) return closePersonMenu();
     var n = state.records.filter(function (r) { return r.personId === p.id; }).length;
     if (!confirm('\u1012\u102e \u101c\u1030 \u1016\u103b\u1000\u103a \u1019\u101c\u102c\u1038? ' + p.name + (n ? ' \u2014 \u1005\u102c\u101b\u1004\u103a\u1038 ' + n + ' \u1001\u102f \u101b\u103e\u102d \u1014\u1031 \u1010\u101a\u103a, \u1021\u1032 \u1005\u102c\u101b\u1004\u103a\u1038 \u1010\u103d\u1031 \u1015\u102b \u1015\u103b\u1031\u102c\u1000\u103a \u1019\u101a\u103a' : ''))) return;
+    state.records.filter(function (r) { return r.personId === p.id; }).forEach(function (r) { Q('delete', '3d_records', r.id, null); });
+    Q('delete', '3d_people', p.id, null);
     state.people = state.people.filter(function (x) { return x.id !== p.id; });
     state.records = state.records.filter(function (r) { return r.personId !== p.id; });
     save(); render(); closePersonMenu();
@@ -738,6 +773,7 @@
     var pcv = $('pmClosed').value.trim();
     var cl = Number(normNum(pcv));
     p.closedLimit = (pcv === '' || isNaN(cl)) ? null : cl;
+    Q('update', '3d_people', p.id, p);
     save(); render(); closePersonMenu();
   });
 
@@ -755,6 +791,7 @@
       el.addEventListener('click', function () {
         var n = el.getAttribute('data-unblock');
         sess().blocked = blockedNums().filter(function (x) { return x !== n; });
+        Q('update', '3d_sessions', sess().id, sess());
         save(); renderBlocked();
       });
     });
@@ -766,6 +803,7 @@
     found.forEach(function (n) { if (list.indexOf(n) < 0) { list.push(n); added++; } });
     $('blockedInput').value = '';
     $('blockedStatus').textContent = added ? added + ' \u101c\u102f\u1036\u1038 \u1011\u100a\u1037\u103a\u1015\u103c\u102e\u1038' : '\u1002\u100f\u1014\u103a\u1038 \u1043 \u101c\u102f\u1036\u1038 \u1011\u100a\u1037\u103a\u1015\u102b';
+    Q('update', '3d_sessions', sess().id, sess());
     save(); renderBlocked();
   });
   // Per-person closed-number cap: ONLY for numbers on the Home closed
@@ -834,8 +872,32 @@
   $('resetBtn').addEventListener('click', function () {
     if (!confirm('အကုန် ရှင်းမလား?')) return;
     localStorage.removeItem(LS_KEY);
+    localStorage.removeItem('3dMasterQueue');
+    localStorage.removeItem('3dMasterAuth');
+    localStorage.removeItem('3dMasterMeta');
     location.reload();
   });
+
+  /* ---------- server login (Master owns the server copy) ---------- */
+  on('serverLoginBtn', 'click', function () {
+    if (!window.Sync3D) return;
+    var em = $('serverEmail').value.trim(), pw = $('serverPass').value;
+    if (!em || !pw) { renderSyncStatus('Email / password ထည့်ပါ'); return; }
+    renderSyncStatus('Login နေ တယ်…');
+    window.Sync3D.login(em, pw).then(function () {
+      $('serverPass').value = '';
+      window.Sync3D.syncNow(state, syncAfter, '').then(function () { renderSyncStatus(); render(); });
+      window.Sync3D.startAutoSync(state, syncAfter, '', function () { renderSyncStatus(); render(); });
+      renderSyncStatus('Login အိုကေ — sync နေ တယ်…');
+    }).catch(function (e) {
+      renderSyncStatus('Login မရ: ' + (e.message || e));
+    });
+  });
+  on('serverLogoutBtn', 'click', function () {
+    if (window.Sync3D) window.Sync3D.logout();
+    renderSyncStatus(); render();
+  });
+  on('syncNowBtn', 'click', syncNowUI);
 
   /* ---------- render all ---------- */
   function render() {
@@ -850,6 +912,11 @@
     renderBlocked();
     renderCloseToggle();
     parseBoard();
+    renderSyncStatus();
   }
   go('home');
+  if (window.Sync3D && window.Sync3D.isLoggedIn()) {
+    window.Sync3D.syncNow(state, syncAfter, '').then(function () { renderSyncStatus(); render(); });
+    window.Sync3D.startAutoSync(state, syncAfter, '', function () { renderSyncStatus(); render(); });
+  }
 })();
