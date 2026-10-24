@@ -154,6 +154,37 @@
     _setQueue(q);
     return entry;
   }
+  /* Queue a create for every local row (first-login migration:
+     pre-sync local data was never queued, so without this it would
+     never reach the server). Skips rows already queued as creates. */
+  function repushAll(state, role) {
+    var q = _queue();
+    var pendingCreate = {};
+    q.forEach(function (e) { if (e.op === 'create' && e.localId) pendingCreate[e.localId] = 1; });
+    var n = 0;
+    function add(coll, obj) {
+      if (!obj || !obj.id || pendingCreate[obj.id]) return;
+      queue('create', coll, obj.id, obj);
+      pendingCreate[obj.id] = 1; n++;
+    }
+    if (role === 'master') (state.sessions || []).forEach(function (s) { add('3d_sessions', s); });
+    (state.people || []).forEach(function (p) { add('3d_people', p); });
+    (state.records || []).forEach(function (r) { add('3d_records', r); });
+    return { queued: n };
+  }
+  /* Repush once per logged-in user (login + boot). Later mutations
+     queue themselves, so this never needs to run twice. */
+  function repushOnce(state, role) {
+    var u = getUser();
+    if (!u) return { queued: 0 };
+    var meta = _meta();
+    if (meta.repushedFor === u.id) return { queued: 0, skipped: true };
+    var r = repushAll(state, role);
+    meta.repushedFor = u.id;
+    _setMeta(meta);
+    return r;
+  }
+
   function _meta() {
     try { return JSON.parse(localStorage.getItem(_cfg.metaKey) || '{}'); } catch (e) { return {}; }
   }
@@ -389,7 +420,12 @@
     var tenant = getTenant();
     var colls = _cfg.role === 'agent' ? ['3d_sessions', '3d_people'] : ['3d_sessions', '3d_people', '3d_records'];
     var meta = _meta();
-    var allowOrphanDelete = !!meta.pulledOnce;
+    /* Orphan rule (fixed Oct 24): a pull deletes ONLY rows it has
+       SEEN on the server before (meta.seen) but that are gone now.
+       A local row never seen on the server is NEVER deleted by pull
+       — that was the v39 bug: pre-sync local data was wiped on the
+       second sync because nothing had ever pushed it. */
+    var seen = meta.seen || {};
     var pulled = 0, errors = [];
     var chain = Promise.resolve();
 
@@ -418,17 +454,18 @@
               pulled++;
             });
           }
-          // Orphan deletion (only after the first pull ever): a row
-          // absent on the server AND with no pending queue op goes.
-          // Queue is re-read NOW, at deletion time.
-          if (allowOrphanDelete) {
-            var pending = {};
-            _queue().forEach(function (e) { if (e.localId) pending[e.localId] = 1; });
-            var listKey = coll === '3d_sessions' ? 'sessions' : coll === '3d_people' ? 'people' : 'records';
-            state[listKey] = (state[listKey] || []).filter(function (row) {
-              return serverIds[row.id] || pending[row.id];
-            });
-          }
+          // Orphan deletion: only rows seen on the server in an
+          // EARLIER pull but absent now — and never rows with a
+          // pending queue op (queue re-read NOW, at deletion time).
+          var oldSeen = {};
+          (seen[coll] || []).forEach(function (id) { oldSeen[id] = 1; });
+          var pending = {};
+          _queue().forEach(function (e) { if (e.localId) pending[e.localId] = 1; });
+          var listKey = coll === '3d_sessions' ? 'sessions' : coll === '3d_people' ? 'people' : 'records';
+          state[listKey] = (state[listKey] || []).filter(function (row) {
+            return serverIds[row.id] || pending[row.id] || !oldSeen[row.id];
+          });
+          seen[coll] = Object.keys(serverIds);
         }).catch(function (err) { errors.push(coll + ': ' + err.message); });
       });
     });
@@ -438,7 +475,7 @@
         var cur = state.sessions.find(function (s) { return s.id === state.currentSessionId; });
         if (!cur) state.currentSessionId = state.sessions[0].id;
       }
-      meta.pulledOnce = true;
+      meta.seen = seen;
       _setMeta(meta);
       _syncing = false;
       if (saveFn) saveFn();
@@ -489,6 +526,8 @@
     getTenant: getTenant,
     getUser: getUser,
     queue: queue,
+    repushAll: repushAll,
+    repushOnce: repushOnce,
     queueCount: function () { return _queue().length; },
     pushPending: pushPending,
     pullUpdates: pullUpdates,
