@@ -375,7 +375,14 @@
     $('entryStatus').textContent = 'အကျွံ ထည့်ပြီး — စစ် ပြီး သိမ်းပါ';
   });
 
+  // Session lock (Pho Oct 24): once the winning number is entered,
+  // the session's bets are frozen - no new entries, edits or deletes.
+  // The winning number itself can still be corrected on its screen.
+  function winLocked() { var s = sess(); return !!(s && s.winning); }
+  var LOCK_MSG = '\u1015\u1031\u102b\u1000\u103a\u101e\u102e\u1038 \u1011\u100a\u103a\u1037\u1015\u103c\u102e\u1038';
+
   $('saveBtn').addEventListener('click', function () {
+    if (winLocked()) { $('entryStatus').textContent = LOCK_MSG + ' — ထိုး မရတော့ပါ'; return; }
     var pid = $('entryPerson').value;
     if (!pid) return;
     var valid = lastParse.filter(function (r) { return r.ok; });
@@ -613,6 +620,7 @@
   on('lmCloseBtn', 'click', closeLineMenu);
   on('lineMenu', 'click', function (e) { if (e.target === $('lineMenu')) closeLineMenu(); });
   on('lmDelBtn', 'click', function () {
+    if (winLocked()) { alert(LOCK_MSG + ' — ဖျက် မရတော့ပါ'); return closeLineMenu(); }
     var recs = lineRecsOf(menuLineId);
     if (!recs.length) return closeLineMenu();
     if (!confirm('ဒီ လိုင်း ဖျက် မလား? ' + recs[0].formula)) return;
@@ -620,6 +628,7 @@
     save(); render(); closeLineMenu();
   });
   on('lmEditBtn', 'click', function () {
+    if (winLocked()) { alert(LOCK_MSG + ' — ပြင် မရတော့ပါ'); return closeLineMenu(); }
     var recs = lineRecsOf(menuLineId);
     if (!recs.length) return closeLineMenu();
     $('lmView').style.display = 'none';
@@ -638,6 +647,7 @@
       : 'ပုံစံ မမှန် — သိမ်း လို့ မရ';
   });
   on('lmSaveBtn', 'click', function () {
+    if (winLocked()) { $('lmHint').textContent = LOCK_MSG + ' — ပြင် မရတော့ပါ'; return; }
     var recs = lineRecsOf(menuLineId);
     if (!recs.length) return closeLineMenu();
     var r = window.Parser3D.parseLine($('lmInput').value);
