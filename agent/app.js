@@ -1,5 +1,7 @@
-/* 3D Agent v3 — local-first + server sync (sync3d).
+/* 3D Agent v6 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
+   Acks (Pho Oct 24, 2D-style): a save entering Master's ledger is
+   auto-acked; this app's vouchers show "ok" on acked batches.
    No ledger / winning / over-limit / blocked screens — those are Master's.
    People here are bettors only; Master owns အကန်ဒိုင်. */
 (function () {
@@ -36,6 +38,7 @@
     } catch (e) { return null; }
   }
   var state = load() || seed();
+  if (!state.ackKeys) state.ackKeys = {}; // ack key -> 1 (seen on server)
   if (window.Sync3D) {
     try {
       window.Sync3D.init({ role: 'agent', authKey: '3dAgentAuth', queueKey: '3dAgentQueue', metaKey: '3dAgentMeta' });
@@ -51,7 +54,40 @@
 
   /* ---------- sync wiring (Pho Oct 24; Agent pushes people+records only) ---------- */
   function Q(op, coll, id, obj) { try { if (window.Sync3D) window.Sync3D.queue(op, coll, id, obj); } catch (e) {} }
-  function syncAfter() { save(); render(); }
+  function syncAfter() { save(); render(); refreshAcks(); }
+
+  /* ---------- acks (Pho Oct 24, 2D-style) ----------
+     Master auto-acks a save once it enters Master's ledger; the
+     ack rows live in 3d_acks and are fetched directly here (not
+     via the sync queue). Matching is by full key, so another
+     agent's acks can never badge this agent's batches. */
+  function ackKey(sid, aid, pid, bn) { return sid + '|' + aid + '|' + pid + '|' + bn; }
+  var lastAckFetch = 0;
+  function refreshAcks() {
+    if (!window.Sync3D || !window.Sync3D.isLoggedIn()) return;
+    var now = Date.now();
+    if (now - lastAckFetch < 300000) return;
+    lastAckFetch = now;
+    var tok = null;
+    try { var a = JSON.parse(localStorage.getItem('3dAgentAuth') || 'null'); tok = a && a.token; } catch (e) {}
+    if (!tok) return;
+    var out = [], page = 1;
+    function next() {
+      return fetch('https://2d.skylinkvpn.stream/api/collections/3d_acks/records?page=' + page + '&perPage=200', { headers: { Authorization: tok } })
+        .then(function (res) { return res.json(); })
+        .then(function (d) {
+          out = out.concat(d.items || []);
+          if (d.totalPages && page < d.totalPages) { page++; return next(); }
+          var changed = false;
+          out.forEach(function (it) {
+            var k = ackKey(it.sessionId, it.agentId, it.personId, it.batchNo);
+            if (!state.ackKeys[k]) { state.ackKeys[k] = 1; changed = true; }
+          });
+          if (changed) { save(); render(); }
+        });
+    }
+    next().catch(function () {});
+  }
   function syncStatusText() {
     if (!window.Sync3D) return 'Sync မရှိ';
     if (!window.Sync3D.isLoggedIn()) return 'Server မချိတ်သေး (local ပဲ သိမ်းမယ်)';
@@ -431,7 +467,8 @@
         body += '<tr id="' + xid + '" style="display:none"><td class="xpand" colspan="2"><div class="xgrid">' + chips + '</div></td></tr>';
       });
       body += '<tr class="vtot"><td colspan="2">Total ' + fmt(total) + '</td></tr>';
-      html += '<div class="vbatch"><div class="vhead">NO ' + bn + '</div>' +
+      var okHere = !!state.ackKeys[ackKey(s.id, (rows[0] && rows[0].agentId) || state.agentCode, pid, bn)];
+      html += '<div class="vbatch"><div class="vhead">NO ' + bn + (okHere ? ' <span class="pos">ok</span>' : '') + '</div>' +
         '<table class="vt">' + body + '</table></div>';
     });
     box.innerHTML = html;
