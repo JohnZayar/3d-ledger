@@ -416,6 +416,18 @@
 
   /* ---------- ledger ---------- */
   var hundred = 0;
+  // Tote set of a session's winning number (Pho's canon): its other
+  // permutations + the whole number -1/+1. Null when no winning set.
+  function toteSetOf(s) {
+    if (!s.winning) return null;
+    var set = {};
+    Parser3D.perms3(s.winning[0], s.winning[1], s.winning[2]).forEach(function (n) { if (n !== s.winning) set[n] = 1; });
+    var wv = parseInt(s.winning, 10);
+    if (wv > 0) set[String(wv - 1).padStart(3, '0')] = 1;
+    if (wv < 999) set[String(wv + 1).padStart(3, '0')] = 1;
+    return set;
+  }
+
   function renderLedger() {
     var s = sess();
     $('limitBtn').textContent = 'Limit ' + fmt(s.limit);
@@ -426,16 +438,7 @@
       el.addEventListener('click', function () { hundred = Number(el.getAttribute('data-h')); renderLedger(); });
     });
     var totals = totalsByNumber();
-    // Ledger highlights (Pho Oct 24): winning number red, its tote set
-    // (other permutations + n-1/n+1, same set as settlement) yellow.
-    var ltset = null;
-    if (s.winning) {
-      ltset = {};
-      Parser3D.perms3(s.winning[0], s.winning[1], s.winning[2]).forEach(function (n) { if (n !== s.winning) ltset[n] = 1; });
-      var lwv = parseInt(s.winning, 10);
-      if (lwv > 0) ltset[String(lwv - 1).padStart(3, '0')] = 1;
-      if (lwv < 999) ltset[String(lwv + 1).padStart(3, '0')] = 1;
-    }
+    var ltset = toteSetOf(s);
     var tSum = 0;
     Object.keys(totals).forEach(function (k) { if (totals[k] > 0) tSum += totals[k]; });
     $('ledTotal').textContent = fmt(tSum);
@@ -530,6 +533,8 @@
   /* ---------- vouchers ---------- */
   $('voucherPerson').addEventListener('change', renderVoucher);
   function renderVoucher() {
+    var s = sess();
+    var vtset = toteSetOf(s);
     var pid = $('voucherPerson').value;
     var box = $('voucherBox');
     if (!pid) { box.innerHTML = '<div class="empty">လူ မရှိသေး</div>'; return; }
@@ -552,9 +557,15 @@
         var label = esc(lineRecs[0].formula);
         if (lineRecs[0].isFormula || lineRecs.length > 1) label += ' (' + lineRecs.length + ')';
         var xid = 'x' + bn + '-' + li;
-        body += '<tr class="vline" data-x="' + xid + '" data-line="' + lineRecs[0].lineId + '"><td class="frm">' + label + '</td>' +
+        var rowCls = 'vline';
+        if (s.winning && lineRecs.some(function (r) { return r.number === s.winning; })) rowCls += ' vwin';
+        else if (vtset && lineRecs.some(function (r) { return vtset[r.number]; })) rowCls += ' vtote';
+        body += '<tr class="' + rowCls + '" data-x="' + xid + '" data-line="' + lineRecs[0].lineId + '"><td class="frm">' + label + '</td>' +
           '<td class="amt">' + fmt(lt) + '</td></tr>';
-        var chips = lineRecs.map(function (r) { return '<span>' + r.number + ' · ' + fmt(r.amount) + '</span>'; }).join('');
+        var chips = lineRecs.map(function (r) {
+          var cc = (s.winning && r.number === s.winning) ? ' class="w"' : (vtset && vtset[r.number]) ? ' class="t"' : '';
+          return '<span' + cc + '>' + r.number + ' · ' + fmt(r.amount) + '</span>';
+        }).join('');
         body += '<tr id="' + xid + '" style="display:none"><td class="xpand" colspan="2"><div class="xgrid">' + chips + '</div></td></tr>';
       });
       body += '<tr class="vtot"><td colspan="2">Total ' + fmt(total) + '</td></tr>';
