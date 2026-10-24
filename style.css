@@ -154,3 +154,17 @@ table.grid.akan th { background: #3a2323; }
 .backrow.ehead select { flex: 1; min-width: 0; }
 .backrow.ehead h2 { white-space: nowrap; }
 .backrow.ehead .kbt { align-self: stretch; }
+
+/* Win/tote ledger highlights (Pho Oct 24): winner RED, tote set YELLOW */
+.cell.tote { border-color: #c9a227; background: #33300f; }
+.cell.tote .n { color: #ffd94a; }
+.cell.win { border-color: #e04848; background: #3a1414; }
+.cell.win .n { color: #ff8f8f; }
+
+/* Voucher win/tote marks (Pho Oct 24): spot hits at a glance */
+table.vt tr.vwin td { background: #331111; }
+table.vt tr.vwin td.frm { color: #ff9a9a; }
+table.vt tr.vtote td { background: #2e2a0d; }
+table.vt tr.vtote td.frm { color: #ffd94a; }
+.xgrid span.w { background: #3a1414; border-color: #e04848; color: #ff8f8f; }
+.xgrid span.t { background: #33300f; border-color: #c9a227; color: #ffd94a; }
