@@ -426,6 +426,16 @@
       el.addEventListener('click', function () { hundred = Number(el.getAttribute('data-h')); renderLedger(); });
     });
     var totals = totalsByNumber();
+    // Ledger highlights (Pho Oct 24): winning number red, its tote set
+    // (other permutations + n-1/n+1, same set as settlement) yellow.
+    var ltset = null;
+    if (s.winning) {
+      ltset = {};
+      Parser3D.perms3(s.winning[0], s.winning[1], s.winning[2]).forEach(function (n) { if (n !== s.winning) ltset[n] = 1; });
+      var lwv = parseInt(s.winning, 10);
+      if (lwv > 0) ltset[String(lwv - 1).padStart(3, '0')] = 1;
+      if (lwv < 999) ltset[String(lwv + 1).padStart(3, '0')] = 1;
+    }
     var tSum = 0;
     Object.keys(totals).forEach(function (k) { if (totals[k] > 0) tSum += totals[k]; });
     $('ledTotal').textContent = fmt(tSum);
@@ -440,6 +450,7 @@
       var cls = 'cell';
       if (amt < 0) cls += ' hed';
       if (amt > s.limit) cls += ' hot';
+      if (ltset && ltset[num]) cls += ' tote';
       if (s.winning && s.winning === num) cls += ' win';
       html += '<div class="' + cls + '"><div class="n">' + num + '</div><div class="a">' +
         (amt ? fmt(amt) : '—') + '</div></div>';
