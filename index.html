@@ -134,8 +134,13 @@
   <!-- ဆက်တင် -->
   <section class="sec" id="sec-settings">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
-    <div class="setrow"><span>App Version</span><b>v38</b></div>
+    <div class="setrow"><span>App Version</span><b>v39</b></div>
     <div class="setrow"><span>ပွဲစဉ်</span><button class="danger" id="closeToggle">ပွဲစဉ် ပိတ်မည်</button></div>
+    <div class="setrow"><span>Server Sync</span><button class="sbtn" id="syncNowBtn">Sync</button></div>
+    <input class="inp" id="serverEmail" type="email" autocomplete="off" placeholder="Server email">
+    <input class="inp" id="serverPass" type="password" autocomplete="off" placeholder="Server password">
+    <div class="frow"><button class="btn" id="serverLoginBtn">Server Login</button><button class="btn gray" id="serverLogoutBtn">Logout</button></div>
+    <div class="status" id="syncStatus"></div>
     <div class="setrow"><span>App Reset</span><button class="danger" id="resetBtn">အကုန် ရှင်း</button></div>
   </section>
 
@@ -174,8 +179,9 @@
   </div>
 </div>
 
-<script src="parser3d.js?v=16"></script>
-<script src="app.js?v=30"></script>
+<script src="parser3d.js?v=17"></script>
+<script src="sync3d.js?v=1"></script>
+<script src="app.js?v=31"></script>
 
 <div id="lineMenu" class="sheet" style="display:none">
   <div class="sheetCard">
