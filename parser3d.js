@@ -193,7 +193,7 @@
       // Triples (000,111,...,999) belong to both bare sets.
       // နောက်ပူး 500 -> 50,000 | 5နောက်ပူး 500 -> 5,000 (055,155,...,955).
       // NOTE: digit+ပူး must precede the positional branch, else "5နောက်"
-      // would misread as the 5နောက် positional cover (007...997).
+      // would misread as the 5နောက် positional cover (005...995).
       mm = str.match(/^(\d)(နောက်ပူး|ထိပ်ပူး|ရှေ့ပူး)/);
       if (mm) {
         var pd = mm[1], outd = [], q;
