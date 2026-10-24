@@ -1,10 +1,10 @@
 :root { color-scheme: dark; }
 * { box-sizing: border-box; margin: 0; font-family: "Segoe UI", system-ui, sans-serif; }
 body { background: #101114; color: #ececec; }
-.app { max-width: 560px; margin: 0 auto; background: radial-gradient(120% 45% at 50% -5%, #292219 0%, #17181c 55%); min-height: 100vh; }
+.app { max-width: 560px; margin: 0 auto; background: radial-gradient(120% 45% at 50% -5%, #23262c 0%, #17181c 55%); min-height: 100vh; }
 
 /* header */
-.hdr { padding: 12px 15px; border-bottom: 1px solid #3a3325; display: flex; justify-content: space-between; align-items: center; }
+.hdr { padding: 12px 15px; border-bottom: 1px solid #3a3b41; display: flex; justify-content: space-between; align-items: center; }
 .hdr .brand { display: flex; align-items: center; gap: 10px; }
 .hdr .badge { width: 37px; height: 37px; border-radius: 11px; background: linear-gradient(145deg, #f4f5f7, #b7bcc6); color: #17181c; font-weight: 900; font-size: 15.5px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(180,190,205,.30); }
 .hdr b { font-size: 18px; letter-spacing: .4px; }
@@ -25,11 +25,11 @@ body { background: #101114; color: #ececec; }
 /* home */
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .tile { background: linear-gradient(180deg, #292b30, #1e1d20); border: 1px solid #3d414b; border-top-color: #878d99; border-radius: 16px; padding: 15px 12px; text-align: center; font-size: 15.5px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04); }
-.tile svg { width: 25px; height: 25px; stroke: #d9b83c; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.tile svg { width: 25px; height: 25px; stroke: #c7cbd3; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .tile.silver { background: linear-gradient(150deg, #f2f3f6, #c2c6cf); border-color: #767b86; color: #17181c; box-shadow: 0 8px 20px rgba(180,190,205,.30); }
 .tile.silver svg { stroke: #17181c; }
 .total { margin-top: 12px; background: linear-gradient(120deg, #26282e, #1e1e23 60%); border: 1px solid #484c56; border-radius: 16px; padding: 13px 16px; display: flex; flex-direction: column; gap: 3px; box-shadow: 0 6px 16px rgba(0,0,0,.35); }
-.total .tlab { font-size: 12.5px; color: #cbb26a; letter-spacing: 1.2px; }
+.total .tlab { font-size: 12.5px; color: #c7cbd3; letter-spacing: 1.2px; }
 .total .tamt { display: flex; align-items: baseline; gap: 7px; }
 .total .tamt span { font-size: 13px; color: #9a9aa2; }
 .total b { font-size: 26px; }
@@ -104,10 +104,10 @@ textarea.ta.board { min-height: 44vh; font-size: 16.5px; line-height: 1.9; }
 .kbt { border: 1px solid #484c56; background: #232429; color: #e3e7ee; border-radius: 10px; padding: 0 15px; font-size: 17px; font-weight: 700; cursor: pointer; }
 .kbt.on { background: linear-gradient(150deg, #f2f3f6, #c2c6cf); color: #17181c; }
 textarea.ta.board { caret-color: #e9edf3; }
-.kb { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 560px; background: #101013; border-top: 1px solid #3a3325; padding: 8px 7px 12px; z-index: 15; box-shadow: 0 -8px 24px rgba(0,0,0,.5); }
+.kb { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 560px; background: #101013; border-top: 1px solid #3a3b41; padding: 8px 7px 12px; z-index: 15; box-shadow: 0 -8px 24px rgba(0,0,0,.5); }
 .krow { display: flex; gap: 6px; margin-bottom: 6px; }
 .krow:last-child { margin-bottom: 0; }
-.k { flex: 1; background: linear-gradient(180deg, #2b2b32, #222228); border: 1px solid #3d3a30; border-bottom-width: 2px; border-radius: 11px; color: #f2f2f2; font-size: 19px; font-weight: 700; padding: 11px 0; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.k { flex: 1; background: linear-gradient(180deg, #2b2b32, #222228); border: 1px solid #3a3b41; border-bottom-width: 2px; border-radius: 11px; color: #f2f2f2; font-size: 19px; font-weight: 700; padding: 11px 0; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
 .k:active { background: #c7cbd3; color: #17181c; }
 .k.fn { background: linear-gradient(180deg, #33363d, #26282e); border-color: #484c56; color: #e3e7ee; font-size: 15.5px; }
 .k.sym { color: #e3e7ee; }
