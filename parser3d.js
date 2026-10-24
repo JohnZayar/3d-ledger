@@ -1,4 +1,6 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v18 (Pho, Oct 24, item 4): mixed-separator subjects + space
+ * amount (+ R split) — "304. 863 346 1000 R 250" and siblings.
  * Parser v17 (Pho, Oct 24): ':' and '/' join the list-separator set
  * (slash-lists only when NOT an any-digit form, which matchMember takes
  * first; '/' is deliberately NOT in the chained-= follow set, so the
@@ -175,12 +177,41 @@
       rS3.head = subs3.length;
       return rS3;
     }
+    // Mixed-separator subjects + split (Pho, Oct 24, item 4): bettors
+    // write with no discipline, e.g. "304. 863 346 1000 R 250" — dots,
+    // spaces and commas mixed between subjects, then a space amount and
+    // an R split. Same Rule B math as the space-subjects split above;
+    // this branch only ADDS forms (a marker after the amount is required,
+    // so it steals nothing the member loop already parses).
+    m = s.match(/^(\d{3}(?:[\s.,~\-:*/]+\d{3})+?)\s*(\d+)\s*(?:ကျန်အာ|ကျန်|အာ|R|r|@|\/)\s*(?:(\d+)\s*ကွက်\s*)?(\d+)$/);
+    if (m) {
+      var subsM = m[1].split(/[\s.,~\-:*/]+/);
+      var sAM = parseInt(m[2], 10), oAM = parseInt(m[4], 10);
+      if (!(sAM > 0) || !(oAM > 0)) return invalid(raw);
+      var spM = splitItems(subsM, sAM, oAM);
+      var itemsM = spM.straights.concat(spM.kyans);
+      if (m[3] !== undefined && parseInt(m[3], 10) !== spM.kyans.length) return invalid(raw);
+      var rSM = finishItems(itemsM, raw, 'split');
+      rSM.head = subsM.length;
+      return rSM;
+    }
     // Space subjects, straight list: "567 765 15000".
     m = s.match(/^(\d{3}(?:\s+\d{3})+?)\s+(\d+)$/);
     if (m) {
       var sA4 = parseInt(m[2], 10);
       if (!(sA4 > 0)) return invalid(raw);
       return finish(m[1].split(/\s+/), sA4, raw, 'list');
+    }
+    // Mixed-separator subjects, straight list (Pho, Oct 24, item 4
+    // sibling): "304. 863 346 1000" = the three numbers at 1000 each.
+    // The amount MUST follow a space, so "123.456.500" (dots throughout)
+    // stays invalid — it has no amount, only three numbers.
+    m = s.match(/^(\d{3}(?:[\s.,~\-:*/]+\d{3})+?)\s+(\d+)$/);
+    if (m) {
+      var subsN = m[1].split(/[\s.,~\-:*/]+/);
+      var sAN = parseInt(m[2], 10);
+      if (!(sAN > 0)) return invalid(raw);
+      return finish(subsN, sAN, raw, 'list');
     }
 
     // General member-list parser (Pho's symbol canon, Oct 22):
