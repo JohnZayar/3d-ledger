@@ -1,4 +1,6 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v24 (Pho, Oct 25): ဘရိတ် = ပွင့် = numbers whose digits
+ * sum to 1, 11, or 21 (3 + 69 + 28 = 100 numbers).
  * Parser v23 (Pho, Oct 25): digit + အပါ = all 3-digit numbers
  * containing that digit (271 numbers, triples included: 1အပါ
  * includes 111).
@@ -319,6 +321,17 @@
           if (ans.indexOf(ad) !== -1) outA.push(ans);
         }
         return { nums: outA, len: mm[0].length, bareOk: true };
+      }
+      // Digit-sum set (Pho, Oct 25): ဘရိတ် = ပွင့် = numbers whose
+      // digits sum to 1, 11, or 21 (3 + 69 + 28 = 100 numbers).
+      mm = str.match(/^ဘရိတ်|^ပွင့်/);
+      if (mm) {
+        var outB = [], bi, bj, bk, bsum;
+        for (bi = 0; bi < 10; bi++) for (bj = 0; bj < 10; bj++) for (bk = 0; bk < 10; bk++) {
+          bsum = bi + bj + bk;
+          if (bsum === 1 || bsum === 11 || bsum === 21) outB.push('' + bi + bj + bk);
+        }
+        return { nums: outB, len: mm[0].length, bareOk: true };
       }
       mm = str.match(/^(\d)(\d)\s*(ထိပ်|ရှေ့|အလယ်|အလည်|လယ်|နောက်)စီးရီး/);
       if (mm) {
