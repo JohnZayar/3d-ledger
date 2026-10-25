@@ -89,7 +89,6 @@
       <input class="inp" id="pPayout" type="text" inputmode="numeric" placeholder="အဆ-တွဒ် (550-10)">
       <input class="inp" id="pComm" type="number" inputmode="numeric" placeholder="ကော်% (25/15/10)">
     </div>
-    <input class="inp" id="pClosed" type="number" inputmode="numeric" placeholder="ပိတ်ဂဏန်း limit တကွက် (ဗလာ = limit မရှိ)">
     <button class="btn" id="addPersonBtn">ထည့်မည်</button>
     <div class="status" id="peopleStatus"></div>
     <div id="peopleList" style="margin-top:10px"></div>
@@ -111,7 +110,7 @@
   <!-- ဆက်တင် -->
   <section class="sec" id="sec-settings">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
-    <div class="setrow"><span>App Version</span><b>v17</b></div>
+    <div class="setrow"><span>App Version</span><b>v18</b></div>
     <div class="setrow"><span>Agent code</span><b id="agentCodeShow">—</b></div>
     <div class="setrow"><span>Server Sync</span><button class="sbtn" id="syncNowBtn">Sync</button></div>
     <div class="status" id="syncStatus"></div>
@@ -132,7 +131,6 @@
       <input id="pmName" class="sheetInput" autocomplete="off" placeholder="အမည်">
       <input id="pmPayout" class="sheetInput" inputmode="numeric" autocomplete="off" placeholder="အဆ-တွဒ် (550-10)">
       <input id="pmComm" class="sheetInput" inputmode="numeric" autocomplete="off" placeholder="ကော်%">
-      <input id="pmClosed" class="sheetInput" inputmode="numeric" autocomplete="off" placeholder="ပိတ်ဂဏန်း limit (ဗလာ = မရှိ)">
       <div class="status" id="pmHint"></div>
       <button class="btn" id="pmSaveBtn">သိမ်းမည်</button>
       <button class="btn gray" id="pmBackBtn">မသိမ်းတော့</button>
@@ -160,6 +158,6 @@
 <!-- All static elements must stay ABOVE these scripts: app.js wires buttons at load time, so anything below never gets listeners (lineMenu buttons were dead, Oct 25). -->
 <script src="../parser3d.js?v=28"></script>
 <script src="../sync3d.js?v=3"></script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>
