@@ -1,4 +1,4 @@
-/* 3D Master v49 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
+/* 3D Master v50 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -431,7 +431,10 @@
 
   /* Long-press a preview/badbox row to delete that board line (Pho, Oct 24):
      hold ~0.5s on a row and the line is gone — no confirm, like the
-     competitor apps. Rows carry their board line index in data-idx. */
+     competitor apps. Rows carry their board line index in data-idx.
+     A small finger tremor (<=12px) must NOT cancel the hold — only a
+     real drag/scroll does (Pho, Oct 25: plain pointermove cancel was
+     too eager and the hold never fired). */
   function deleteBoardLine(li) {
     var ls = $('board').value.split('\n');
     if (li < 0 || li >= ls.length) return;
@@ -441,15 +444,21 @@
     $('board').focus();
   }
   function bindRowDelete(el) {
-    var timer = null;
+    var timer = null, sx = 0, sy = 0;
     el.addEventListener('pointerdown', function (e) {
       var row = e.target.closest ? e.target.closest('[data-idx]') : null;
       if (!row) return;
       var li = parseInt(row.getAttribute('data-idx'), 10);
+      sx = e.clientX || 0; sy = e.clientY || 0;
       timer = setTimeout(function () { timer = null; deleteBoardLine(li); }, 500);
     });
-    ['pointerup', 'pointerleave', 'pointercancel', 'pointermove'].forEach(function (ev) {
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
       el.addEventListener(ev, function () { if (timer) { clearTimeout(timer); timer = null; } });
+    });
+    el.addEventListener('pointermove', function (e) {
+      if (!timer) return;
+      var dx = (e.clientX || 0) - sx, dy = (e.clientY || 0) - sy;
+      if (dx * dx + dy * dy > 144) { clearTimeout(timer); timer = null; }
     });
     el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   }
