@@ -1,4 +1,4 @@
-/* 3D Master v55 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
+/* 3D Master v56 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -617,7 +617,7 @@
     var badC = closedViolation(pid, newItems, null);
     if (badC) {
       $('entryStatus').textContent = '\u1015\u102d\u1010\u103a\u1002\u100f\u1014\u103a\u1038 ' + badC.n + ' \u2014 ' + person(pid).name +
-        ' limit ' + fmt(badC.cap) + ' \u1000\u103b\u1031\u102c\u103a \u1019\u101a\u103a (' + fmt(badC.tot) + ' \u1016\u103c\u1005\u103a \u1014\u1031)';
+        ' limit ' + fmt(badC.cap) + ' \u1000\u103b\u1031\u102c\u103a \u1019\u101a\u103a (' + fmt(badC.tot) + ' \u1016\u103c\u1005\u103a \u1014\u1031)' + exclHint(badC);
       return;
     }
     var batchNo = 1;
@@ -938,8 +938,8 @@
     if (!r.ok) { $('lmHint').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
     var badL = closedViolation(recs[0].personId, r.items, menuLineId);
     var badA = recs[0].agentId ? agentClosedViolation(recs[0].agentId, r.items, menuLineId) : null;
-    if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' limit ' + fmt(badA.cap) + ' ကျော် နေတယ် (Agent စုစုပေါင်း)'; return; }
-    if (badL) { $('lmHint').textContent = '\u1015\u102d\u1010\u103a\u1002\u100f\u1014\u103a\u1038 ' + badL.n + ' limit ' + fmt(badL.cap) + ' \u1000\u103b\u1031\u102c\u103a \u1019\u101a\u103a'; return; }
+    if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' limit ' + fmt(badA.cap) + ' ကျော် နေတယ် (Agent စုစုပေါင်း)' + exclHintShort(badA); return; }
+    if (badL) { $('lmHint').textContent = '\u1015\u102d\u1010\u103a\u1002\u100f\u1014\u103a\u1038 ' + badL.n + ' limit ' + fmt(badL.cap) + ' \u1000\u103b\u1031\u102c\u103a \u1019\u101a\u103a' + exclHintShort(badL); return; }
     var first = recs[0];
     var idx = state.records.indexOf(first);
     state.records = state.records.filter(function (x) { return x.lineId !== menuLineId; });
@@ -1055,6 +1055,9 @@
   });
   // Per-person closed-number cap: ONLY for numbers on the Home closed
   // list, ONLY when the person has a limit set (blank = no limit).
+  // Block message: show the exclusion the bettor must write (Pho Oct 25).
+  function exclHint(bad) { return ' {-'+(bad.all || [bad.n]).join('/')+'} ဖယ်ထုတ်ပြီး ပြန်ထိုးပါ'; }
+  function exclHintShort(bad) { return ' {-'+(bad.all || [bad.n]).join('/')+'} ဖယ်ထုတ်ပါ'; }
   function closedViolation(pid, items, excludeLineId) {
     var p = person(pid);
     if (!p || p.closedLimit == null) return null;
@@ -1071,11 +1074,12 @@
       if (excludeLineId && r.lineId === excludeLineId) return;
       if (list.indexOf(r.number) >= 0) existing[r.number] = (existing[r.number] || 0) + r.amount;
     });
-    var bad = null;
+    var bad = null, all = [];
     Object.keys(sums).forEach(function (n) {
       var tot = (existing[n] || 0) + sums[n];
-      if (tot > p.closedLimit && !bad) bad = { n: n, cap: p.closedLimit, tot: tot };
+      if (tot > p.closedLimit) { if (!bad) bad = { n: n, cap: p.closedLimit, tot: tot }; all.push(n); }
     });
+    if (bad) bad.all = all;
     return bad;
   }
   // Agent aggregate hot-limit (Pho Oct 24): the agent-person's
@@ -1097,11 +1101,12 @@
       if (excludeLineId && r.lineId === excludeLineId) return;
       if (list.indexOf(r.number) >= 0) existing[r.number] = (existing[r.number] || 0) + r.amount;
     });
-    var bad = null;
+    var bad = null, all = [];
     Object.keys(sums).forEach(function (n) {
       var tot = (existing[n] || 0) + sums[n];
-      if (tot > ap.closedLimit && !bad) bad = { n: n, cap: ap.closedLimit, tot: tot };
+      if (tot > ap.closedLimit) { if (!bad) bad = { n: n, cap: ap.closedLimit, tot: tot }; all.push(n); }
     });
+    if (bad) bad.all = all;
     return bad;
   }
 
