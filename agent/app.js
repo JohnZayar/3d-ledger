@@ -1,4 +1,4 @@
-/* 3D Agent v16 — local-first + server sync (sync3d).
+/* 3D Agent v17 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
    Separateness (Pho Oct 24, သတ်သတ်စီ): this app shows ONLY its
    own bettors — never Master people, never other agents' bettors,
@@ -327,6 +327,8 @@
     $('lastTotal').textContent = fmt(last);
   }
   $('board').addEventListener('input', parseBoard);
+  $('board').addEventListener('input', hideExcl);
+  $('entryPerson').addEventListener('change', hideExcl);
 
   /* Long-press a preview/badbox row to delete that board line (Pho, Oct 24):
      hold ~0.5s on a row and the line is gone — no confirm, like the
@@ -400,9 +402,16 @@
   function winLocked() { var s = sess(); return !!(s && (s.winning || s.closed)); }
   function lockPrefix() { var s = sess(); return (s && s.winning) ? 'ပေါက်သီး ထည့်ပြီး' : 'ပွဲစဉ် ပိတ်ထားသည်'; }
 
-  // Block message: show the exclusion the bettor must write (Pho Oct 25).
-  function exclHint(bad) { return ' {-'+(bad.all || [bad.n]).join('/')+'} ဖယ်ထုတ်ပြီး ပြန်ထိုးပါ'; }
-  function exclHintShort(bad) { return ' {-'+(bad.all || [bad.n]).join('/')+'} ဖယ်ထုတ်ပါ'; }
+  // Block UI (Pho Oct 25): short message + one-tap exclude-and-save.
+  // No long explanation (Pho: 'စာတွေများလွန်းတယ်, Appရှုပ်တယ်').
+  var exclPending = null;
+  function exclTag(bad) { return ' {-'+(bad.all || [bad.n]).join('/')+'}'; }
+  function hideExcl() { exclPending = null; var b = $('exclSaveBtn'); if (b) b.style.display = 'none'; }
+  function showExcl(bad) {
+    exclPending = bad;
+    $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + (bad.all || [bad.n]).join('/');
+    var b = $('exclSaveBtn'); if (b) b.style.display = '';
+  }
   function closedViolation(pid, items, excludeLineId) {
     var p = person(pid);
     if (!p || p.closedLimit == null) return null;
@@ -455,7 +464,26 @@
     return bad;
   }
 
+  $('exclSaveBtn').addEventListener('click', function () {
+    if (!exclPending) return;
+    var nums = exclPending.all || [exclPending.n];
+    hideExcl();
+    var out = $('board').value.split('\n').map(function (ln) {
+      var r = parseLine(ln);
+      if (!r.ok) return ln;
+      var hit = r.items.filter(function (it) { return nums.indexOf(it.number) >= 0; }).map(function (it) { return it.number; });
+      var uniq = hit.filter(function (x, i) { return hit.indexOf(x) === i; });
+      if (!uniq.length) return ln;
+      return ln + '{-' + uniq.join('/') + '}';
+    });
+    $('board').value = out.join('\n');
+    parseBoard();
+    if (!lastParse.every(function (r) { return r.ok; })) { $('entryStatus').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
+    $('saveBtn').click();
+  });
+
   $('saveBtn').addEventListener('click', function () {
+    hideExcl();
     if (winLocked()) { $('entryStatus').textContent = lockPrefix() + ' — ထိုး မရတော့ပါ'; return; }
     var pid = $('entryPerson').value;
     if (!pid) return;
@@ -468,12 +496,8 @@
     if (!sp || sp.role === 'agent' || sp.agentId !== state.agentCode) { $('entryStatus').textContent = 'ဒီလူကို ရွေးလို့ မရပါ'; return; }
     var badC = closedViolation(pid, newItems, null);
     var badA = agentClosedViolation(state.agentCode, newItems, null);
-    if (badA) { $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' — Agent စုစုပေါင်း limit ' + fmt(badA.cap) + ' ကျော် နေတယ် (' + fmt(badA.tot) + ' ဖက် နေ)' + exclHint(badA); return; }
-    if (badC) {
-      $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + badC.n + ' — ' + person(pid).name +
-        ' limit ' + fmt(badC.cap) + ' ကျော် နေတယ် (' + fmt(badC.tot) + ' ဖက် နေ)' + exclHint(badC);
-      return;
-    }
+    if (badA) { showExcl(badA); return; }
+    if (badC) { showExcl(badC); return; }
     var batchNo = 1;
     sessRecords().forEach(function (r) {
       if (r.personId === pid && r.batchNo >= batchNo) batchNo = r.batchNo + 1;
@@ -627,8 +651,8 @@
     if (!r.ok) { $('lmHint').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
     var badL = closedViolation(recs[0].personId, r.items, menuLineId);
     var badA = recs[0].agentId ? agentClosedViolation(recs[0].agentId, r.items, menuLineId) : null;
-    if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' Agent စုစုပေါင်း limit ' + fmt(badA.cap) + ' ကျော် နေတယ်' + exclHintShort(badA); return; }
-    if (badL) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badL.n + ' limit ' + fmt(badL.cap) + ' ကျော် နေတယ်' + exclHintShort(badL); return; }
+    if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + (badA.all || [badA.n]).join('/') + exclTag(badA); return; }
+    if (badL) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + (badL.all || [badL.n]).join('/') + exclTag(badL); return; }
     var first = recs[0];
     var idx = state.records.indexOf(first);
     state.records = state.records.filter(function (x) { return x.lineId !== menuLineId; });
