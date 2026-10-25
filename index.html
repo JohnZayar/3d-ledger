@@ -49,6 +49,7 @@
     <div class="prev" id="preview" style="display:none"></div>
     <div class="bad" id="badbox" style="display:none"></div>
     <div class="btnrow"><button class="btn gray" id="scanBtn">စကန်</button><button class="btn gray" id="overBtn">အကျွံ</button><input type="file" id="scanFile" accept="image/*" style="display:none"><button class="btn" id="saveBtn" disabled>သိမ်းမည်</button></div>
+    <button class="btn" id="exclSaveBtn" style="display:none">ဖယ်ထုတ်ပြီး သိမ်း</button>
     <div class="status" id="entryStatus"></div>
     <style>.krow.scroll{display:flex;gap:6px;margin-bottom:6px}.kscroll{display:flex;gap:6px;overflow-x:auto;flex:1;-webkit-overflow-scrolling:touch}.kscroll .k{flex:0 0 auto;padding:6px 12px;font-size:14px}.krow.scroll>.k.sym{flex:0 0 auto;padding:6px 12px;font-size:14px}.kscroll::-webkit-scrollbar{height:3px}.kscroll::-webkit-scrollbar-thumb{background:#c9a227;border-radius:2px}</style>
     <div class="kb" id="kb" style="display:none">
@@ -143,7 +144,7 @@
   <!-- ဆက်တင် -->
   <section class="sec" id="sec-settings">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
-    <div class="setrow"><span>App Version</span><b>v56</b></div>
+    <div class="setrow"><span>App Version</span><b>v57</b></div>
     <div class="setrow"><span>ပွဲစဉ်</span><button class="danger" id="closeToggle">ပွဲစဉ် ပိတ်မည်</button></div>
     <div class="setrow"><span>Server Sync</span><button class="sbtn" id="syncNowBtn">Sync</button></div>
     <input class="inp" id="serverEmail" type="email" autocomplete="off" placeholder="Server email">
@@ -226,6 +227,6 @@
 <!-- All static elements must stay ABOVE these scripts: app.js wires buttons at load time, so anything below never gets listeners (lineMenu buttons were dead, Oct 25). -->
 <script src="parser3d.js?v=28"></script>
 <script src="sync3d.js?v=3"></script>
-<script src="app.js?v=46"></script>
+<script src="app.js?v=47"></script>
 </body>
 </html>
