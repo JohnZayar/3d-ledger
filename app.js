@@ -1,4 +1,4 @@
-/* 3D Master v57 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
+/* 3D Master v58 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -953,7 +953,9 @@
     if (!recs.length) return closeLineMenu();
     var r = window.Parser3D.parseLine($('lmInput').value);
     if (!r.ok) { $('lmHint').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
-    var badL = closedViolation(recs[0].personId, r.items, menuLineId);
+    // Pho Oct 25: agent bettors have no per-person hot limit (Agent-side
+    // removal) — the agent-aggregate cap below is their only cap.
+    var badL = recs[0].agentId ? null : closedViolation(recs[0].personId, r.items, menuLineId);
     var badA = recs[0].agentId ? agentClosedViolation(recs[0].agentId, r.items, menuLineId) : null;
     if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + (badA.all || [badA.n]).join('/') + exclTag(badA); return; }
     if (badL) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + (badL.all || [badL.n]).join('/') + exclTag(badL); return; }
