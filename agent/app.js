@@ -1,4 +1,4 @@
-/* 3D Agent v7 — local-first + server sync (sync3d).
+/* 3D Agent v8 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
    Separateness (Pho Oct 24, သတ်သတ်စီ): this app shows ONLY its
    own bettors — never Master people, never other agents' bettors,
@@ -275,8 +275,10 @@
   function parseBoard() {
     var lines = $('board').value.split('\n');
     lastParse = [];
-    lines.forEach(function (ln) {
+    var lineIdx = [];
+    lines.forEach(function (ln, li) {
       if (!ln.trim()) return;
+      lineIdx.push(li);
       lastParse.push(parseLine(ln));
     });
     var valid = lastParse.filter(function (r) { return r.ok; });
@@ -287,15 +289,15 @@
         if (r.kind === 'split') {
           var head = r.head || 1;
           var sIt = r.items.slice(0, head), rIt = r.items.slice(head);
-          return '<div>' + esc(r.formula) + ' → ' + head + ' လုံး × ' + fmt(sIt[0].amount) +
+          return '<div data-idx="' + lineIdx[lastParse.indexOf(r)] + '" style="-webkit-touch-callout:none;user-select:none">' + esc(r.formula) + ' → ' + head + ' လုံး × ' + fmt(sIt[0].amount) +
             (rIt.length ? ' + ကျန် ' + rIt.length + ' × ' + fmt(rIt[0].amount) : '') + '</div>';
         }
         if (r.kind === 'daekyan') {
           var rest = r.items.slice(1);
-          return '<div>' + esc(r.formula) + ' → ဒဲ့ ' + fmt(r.items[0].amount) +
+          return '<div data-idx="' + lineIdx[lastParse.indexOf(r)] + '" style="-webkit-touch-callout:none;user-select:none">' + esc(r.formula) + ' → ဒဲ့ ' + fmt(r.items[0].amount) +
             (rest.length ? ' + ကျန် ' + rest.length + ' × ' + fmt(rest[0].amount) : '') + '</div>';
         }
-        return '<div>' + esc(r.formula) + ' → ' + r.count + ' ကွက် × ' + fmt(r.items[0].amount) + '</div>';
+        return '<div data-idx="' + lineIdx[lastParse.indexOf(r)] + '" style="-webkit-touch-callout:none;user-select:none">' + esc(r.formula) + ' → ' + r.count + ' ကွက် × ' + fmt(r.items[0].amount) + '</div>';
       }).join('');
       var tc = valid.reduce(function (a, r) { return a + r.count; }, 0);
       var tt = valid.reduce(function (a, r) { return a + r.total; }, 0);
@@ -304,7 +306,7 @@
     } else pv.style.display = 'none';
     var bb = $('badbox');
     if (bad.length) {
-      bb.innerHTML = bad.map(function (r) { return '<div>' + esc(r.formula) + '</div>'; }).join('');
+      bb.innerHTML = bad.map(function (r) { return '<div data-idx="' + lineIdx[lastParse.indexOf(r)] + '" style="-webkit-touch-callout:none;user-select:none">' + esc(r.formula) + '</div>'; }).join('');
       bb.style.display = 'block';
     } else bb.style.display = 'none';
     $('saveBtn').disabled = !(valid.length && $('entryPerson').value);
@@ -325,6 +327,33 @@
     $('lastTotal').textContent = fmt(last);
   }
   $('board').addEventListener('input', parseBoard);
+
+  /* Long-press a preview/badbox row to delete that board line (Pho, Oct 24):
+     hold ~0.5s on a row and the line is gone — no confirm, like the
+     competitor apps. Rows carry their board line index in data-idx. */
+  function deleteBoardLine(li) {
+    var ls = $('board').value.split('\n');
+    if (li < 0 || li >= ls.length) return;
+    ls.splice(li, 1);
+    $('board').value = ls.join('\n');
+    parseBoard();
+    $('board').focus();
+  }
+  function bindRowDelete(el) {
+    var timer = null;
+    el.addEventListener('pointerdown', function (e) {
+      var row = e.target.closest ? e.target.closest('[data-idx]') : null;
+      if (!row) return;
+      var li = parseInt(row.getAttribute('data-idx'), 10);
+      timer = setTimeout(function () { timer = null; deleteBoardLine(li); }, 500);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel', 'pointermove'].forEach(function (ev) {
+      el.addEventListener(ev, function () { if (timer) { clearTimeout(timer); timer = null; } });
+    });
+    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  }
+  bindRowDelete($('preview'));
+  bindRowDelete($('badbox'));
 
   /* ---------- quick keyboard (same layout as Master) ---------- */
   var kbOpen = false;
