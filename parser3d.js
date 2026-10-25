@@ -1,4 +1,9 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v27 (Pho, Oct 25): trailing {-...} exclusion — numbers
+ * listed after the amount in braces are removed from the expansion:
+ * "5ထိပ်5500{-500}" (99 numbers), "5ပွင့် 6500{-447/474/744}"
+ * (97 numbers); separators '/' ',' or space; non-members ignored;
+ * excluding everything (or a malformed list) is invalid.
  * Parser v26 (Pho, Oct 25): bare ဘရိတ် REMOVED — bare ဘရိတ် does
  * not exist ('အလွတ်ဘရိတ်မရှိဖျက်'); digit + ဘရိတ် ONLY
  * (1ဘရိတ်…9ဘရိတ်, 0/10ဘရိတ်; digit + ပွင့် likewise).
@@ -115,6 +120,25 @@
     var raw = (line == null ? '' : String(line)).trim();
     if (!raw) return invalid(raw);
     var s = normalizeDigits(raw);
+    // Exclusion (Pho, Oct 25): a trailing {-...} group removes its
+    // numbers from the expansion (applied after the body parses, so
+    // it works for every line kind; stacked groups recurse).
+    var ex = s.match(/^(.*)\{\s*-\s*([0-9\s\/,]+)\}\s*$/);
+    if (ex) {
+      var excl = {}, eparts = ex[2].split(/[\s\/,]+/).filter(function (x) { return !!x; });
+      for (var ei = 0; ei < eparts.length; ei++) {
+        if (!/^\d{3}$/.test(eparts[ei])) return invalid(raw);
+        excl[eparts[ei]] = 1;
+      }
+      if (!eparts.length) return invalid(raw);
+      var base = parseLine(ex[1]);
+      if (!base.ok) return invalid(raw);
+      var kept = base.items.filter(function (it) { return !excl[it.number]; });
+      if (!kept.length) return invalid(raw);
+      var rr = finishItems(kept, raw, base.kind);
+      if (base.head !== undefined) rr.head = base.head;
+      return rr;
+    }
     var m;
 
     // Dae + Kyan split pricing (single plain number only, Pho Oct 22):
