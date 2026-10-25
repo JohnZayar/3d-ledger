@@ -1,4 +1,7 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v23 (Pho, Oct 25): digit + အပါ = all 3-digit numbers
+ * containing that digit (271 numbers, triples included: 1အပါ
+ * includes 111).
  * Parser v22 (Pho, Oct 25): အခွ = XYX split pair (first = last,
  * middle different, triples excluded) — 010-090, 101-191, ...,
  * 909-989 = 90 numbers.
@@ -304,6 +307,18 @@
         for (sx = 0; sx < 10; sx++) for (sy = 0; sy < 10; sy++)
           if (sy !== sx) outS.push(String(sx) + String(sy) + String(sx));
         return { nums: outS, len: mm[0].length, bareOk: true };
+      }
+      // Containing-digit set (Pho, Oct 25): digit + အပါ = all 3-digit
+      // numbers containing that digit (271 numbers, triples included:
+      // 1အပါ includes 001, 010, 100, 111, ..., 991).
+      mm = str.match(/^(\d)အပါ/);
+      if (mm) {
+        var outA = [], ad = mm[1], ai, ans;
+        for (ai = 0; ai < 1000; ai++) {
+          ans = (ai < 10 ? '00' : ai < 100 ? '0' : '') + ai;
+          if (ans.indexOf(ad) !== -1) outA.push(ans);
+        }
+        return { nums: outA, len: mm[0].length, bareOk: true };
       }
       mm = str.match(/^(\d)(\d)\s*(ထိပ်|ရှေ့|အလယ်|အလည်|လယ်|နောက်)စီးရီး/);
       if (mm) {
