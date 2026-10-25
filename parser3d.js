@@ -1,4 +1,7 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v22 (Pho, Oct 25): အခွ = XYX split pair (first = last,
+ * middle different, triples excluded) — 010-090, 101-191, ...,
+ * 909-989 = 90 numbers.
  * Parser v21 (Pho, Oct 25): ရာပြည့် = 100..900 (9 numbers, 000 NOT
  * included — distinct from the ထွိုင် triples set).
  * Parser v20 (Pho, Oct 25): '=' as the amount separator after
@@ -289,6 +292,18 @@
             out3.push(String(pa) + String(pa) + String(pb));
         }
         return { nums: out3, len: mm[0].length, bareOk: true };
+      }
+      // Split pair (Pho, Oct 25): အခွ = first = last, middle different,
+      // triples excluded — the pair is SPLIT by the middle digit
+      // (vs နောက်ပူး XYY pair-together-at-back, ရှေ့ပူး YYX
+      // pair-together-at-front). Rows 010-090, 101-191, ...,
+      // 909-989 = 90 numbers.
+      mm = str.match(/^အခွ/);
+      if (mm) {
+        var outS = [], sx, sy;
+        for (sx = 0; sx < 10; sx++) for (sy = 0; sy < 10; sy++)
+          if (sy !== sx) outS.push(String(sx) + String(sy) + String(sx));
+        return { nums: outS, len: mm[0].length, bareOk: true };
       }
       mm = str.match(/^(\d)(\d)\s*(ထိပ်|ရှေ့|အလယ်|အလည်|လယ်|နောက်)စီးရီး/);
       if (mm) {
