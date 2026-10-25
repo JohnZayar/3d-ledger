@@ -516,6 +516,17 @@
     if (typeof window !== 'undefined') {
       window.addEventListener('online', function () { syncNow(state, saveFn, agentCode).then(function (r) { if (onSync) onSync(r); }).catch(function () {}); });
     }
+    // Pho Oct 25: sync immediately when the app returns to the
+    // foreground — background timers freeze on phones, so without this
+    // the outside phone can sit stale long past the 60s interval.
+    if (typeof document !== 'undefined' && document.addEventListener) {
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) return;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+        if (!isLoggedIn()) return;
+        syncNow(state, saveFn, agentCode).then(function (r) { if (onSync) onSync(r); }).catch(function () {});
+      });
+    }
     if (typeof setInterval !== 'undefined') {
       setInterval(function () {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
