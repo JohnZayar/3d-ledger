@@ -1,4 +1,7 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v20 (Pho, Oct 25): '=' as the amount separator after
+ * space-joined subjects — "325.625 963=500" (was invalid: the member
+ * loop breaks at the space, and no subjects branch took '=').
  * Parser v19 (Pho, Oct 24): parenthesized / braced amounts — "123.456(500)",
  * "123.456{500}", "345,769 543-211(150r100)" (bettors write amounts in
  * brackets; plain 123.456.500 with no amount is NOT their writing).
@@ -186,7 +189,7 @@
     // an R split. Same Rule B math as the space-subjects split above;
     // this branch only ADDS forms (a marker after the amount is required,
     // so it steals nothing the member loop already parses).
-    m = s.match(/^(\d{3}(?:[\s.,~\-:*/]+\d{3})+?)\s*(\d+)\s*(?:ကျန်အာ|ကျန်|အာ|R|r|@|\/)\s*(?:(\d+)\s*ကွက်\s*)?(\d+)$/);
+    m = s.match(/^(\d{3}(?:[\s.,~\-:*/]+\d{3})+?)\s*=?\s*(\d+)\s*(?:ကျန်အာ|ကျန်|အာ|R|r|@|\/)\s*(?:(\d+)\s*ကွက်\s*)?(\d+)$/);
     if (m) {
       var subsM = m[1].split(/[\s.,~\-:*/]+/);
       var sAM = parseInt(m[2], 10), oAM = parseInt(m[4], 10);
@@ -222,7 +225,7 @@
     // sibling): "304. 863 346 1000" = the three numbers at 1000 each.
     // The amount MUST follow a space, so "123.456.500" (dots throughout)
     // stays invalid — it has no amount, only three numbers.
-    m = s.match(/^(\d{3}(?:[\s.,~\-:*/]+\d{3})+?)\s+(\d+)$/);
+    m = s.match(/^(\d{3}(?:[\s.,~\-:*/]+\d{3})+?)(?:\s+|\s*=\s*)(\d+)$/);
     if (m) {
       var subsN = m[1].split(/[\s.,~\-:*/]+/);
       var sAN = parseInt(m[2], 10);
