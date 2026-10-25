@@ -1,4 +1,4 @@
-/* 3D Agent v13 — local-first + server sync (sync3d).
+/* 3D Agent v14 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
    Separateness (Pho Oct 24, သတ်သတ်စီ): this app shows ONLY its
    own bettors — never Master people, never other agents' bettors,
