@@ -1,4 +1,6 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v21 (Pho, Oct 25): ရာပြည့် = 100..900 (9 numbers, 000 NOT
+ * included — distinct from the ထွိုင် triples set).
  * Parser v20 (Pho, Oct 25): '=' as the amount separator after
  * space-joined subjects — "325.625 963=500" (was invalid: the member
  * loop breaks at the space, and no subjects branch took '=').
@@ -249,11 +251,16 @@
     //          triple set /// or its keyword names (10 numbers).
     // Tails: (=|space) A straight | (@|R|r) A perms | = A (R|r) B split.
     var TRIPLES = ['000', '111', '222', '333', '444', '555', '666', '777', '888', '999'];
+    var HUNDREDS = ['100', '200', '300', '400', '500', '600', '700', '800', '900'];
     function matchMember(str) {
       var mm, i;
       if (str.indexOf('///') === 0) return { nums: TRIPLES, len: 3, bareOk: true };
       mm = str.match(/^ထွိုင်ဆယ်ကွက်|^ထွိုင်|^အပူးစုံ/);
       if (mm) return { nums: TRIPLES, len: mm[0].length, bareOk: true };
+      // Hundreds-complete (Pho, Oct 25): ရာပြည့် = 100..900 (9 numbers,
+      // 000 NOT included — distinct from the ထွိုင် triples set).
+      mm = str.match(/^ရာပြည့်/);
+      if (mm) return { nums: HUNDREDS, len: mm[0].length, bareOk: true };
       // Pair covers (Pho, Oct 24): bare keyword = whole pair set (100
       // numbers); digit + keyword = that pair digit only (10 numbers).
       // နောက်ပူး = last two equal (XYY); ထိပ်ပူး / ရှေ့ပူး = first two equal (YYX).
