@@ -1,4 +1,4 @@
-/* 3D Agent v18 — local-first + server sync (sync3d).
+/* 3D Agent v19 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
    Separateness (Pho Oct 24, သတ်သတ်စီ): this app shows ONLY its
    own bettors — never Master people, never other agents' bettors,
@@ -70,7 +70,7 @@
   function refreshAcks() {
     if (!window.Sync3D || !window.Sync3D.isLoggedIn()) return;
     var now = Date.now();
-    if (now - lastAckFetch < 300000) return;
+    if (now - lastAckFetch < 60000) return; // Pho Oct 25: OK badge lag — was 5 min, now matches the 60s sync cadence.
     lastAckFetch = now;
     var tok = null;
     try { var a = JSON.parse(localStorage.getItem('3dAgentAuth') || 'null'); tok = a && a.token; } catch (e) {}
