@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="style.css?v=35">
+<link rel="stylesheet" href="style.css?v=36">
 </head>
 <body>
 <div class="app">
@@ -52,7 +52,7 @@
     <div class="bad" id="badbox" style="display:none"></div>
     <div class="btnrow"><button class="btn" id="saveBtn" disabled>သိမ်းမည်</button></div>
     <div class="status" id="entryStatus"></div>
-    <style>.krow.scroll{display:flex;gap:6px;margin-bottom:6px}.kscroll{display:flex;gap:6px;overflow-x:auto;flex:1;-webkit-overflow-scrolling:touch}.kscroll .k{flex:0 0 auto;padding:6px 12px;font-size:14px}.krow.scroll>.k.sym{flex:0 0 auto;padding:6px 12px;font-size:14px}.kscroll::-webkit-scrollbar{height:3px}.kscroll::-webkit-scrollbar-thumb{background:#c9a227;border-radius:2px}</style>
+    <style>.krow.scroll{display:flex;gap:6px;margin-bottom:6px}.kscroll{display:flex;gap:6px;overflow-x:auto;flex:1;-webkit-overflow-scrolling:touch}.kscroll .k{flex:0 0 auto;padding:6px 12px;font-size:14px;background:#2b3242;border-color:#3d4a63;color:#cfd6e4}.kscroll .k:active{background:#3d4a63;color:#fff}.krow.scroll>.k.sym{flex:0 0 auto;padding:6px 12px;font-size:14px}.kscroll::-webkit-scrollbar{height:3px}.kscroll::-webkit-scrollbar-thumb{background:#8fb8e8;border-radius:2px}</style>
     <div class="kb" id="kb" style="display:none">
       <div class="krow scroll">
         <div class="kscroll">
@@ -110,7 +110,7 @@
   <!-- ဆက်တင် -->
   <section class="sec" id="sec-settings">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
-    <div class="setrow"><span>App Version</span><b>v14</b></div>
+    <div class="setrow"><span>App Version</span><b>v15</b></div>
     <div class="setrow"><span>Agent code</span><b id="agentCodeShow">—</b></div>
     <div class="setrow"><span>Server Sync</span><button class="sbtn" id="syncNowBtn">Sync</button></div>
     <div class="status" id="syncStatus"></div>
@@ -159,6 +159,6 @@
 <!-- All static elements must stay ABOVE these scripts: app.js wires buttons at load time, so anything below never gets listeners (lineMenu buttons were dead, Oct 25). -->
 <script src="../parser3d.js?v=27"></script>
 <script src="../sync3d.js?v=3"></script>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
