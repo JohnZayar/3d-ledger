@@ -52,14 +52,16 @@
     <div class="bad" id="badbox" style="display:none"></div>
     <div class="btnrow"><button class="btn" id="saveBtn" disabled>သိမ်းမည်</button></div>
     <div class="status" id="entryStatus"></div>
-    <style>.krow.kw{margin-bottom:4px}.krow.kw .k{padding:6px 0;font-size:14px}</style>
+    <style>.krow.kw{margin-bottom:4px}.krow.kw .k,.krow.r2 .k{padding:6px 0;font-size:14px}</style>
     <div class="kb" id="kb" style="display:none">
       <div class="krow kw">
-        <div class="k fn" data-t="ထိပ်">ထိပ်</div><div class="k fn" data-t="နောက်">နောက်</div><div class="k fn" data-t="အလယ်">အလယ်</div><div class="k fn" data-t="စီးရီး">စီးရီး</div><div class="k fn" data-t="နောက်ပူး">နောက်ပူး</div>
+        <div class="k fn" data-t="ထိပ်">ထိပ်</div><div class="k fn" data-t="နောက်">နောက်</div><div class="k fn" data-t="အလယ်">အလယ်</div><div class="k fn" data-t="စီးရီး">စီးရီး</div><div class="k fn" data-t="အခွ">အခွ</div>
       </div>
-      <div class="krow">
+      <div class="krow r2">
         <div class="k fn" data-t="ဒဲ့">ဒဲ့</div>
         <div class="k fn" data-t="ကျန်">ကျန်</div>
+        <div class="k fn" data-t="ရှေ့ပူး">ရှေ့ပူး</div>
+        <div class="k fn" data-t="နောက်ပူး">နောက်ပူး</div>
         <div class="k fn" data-t="R">R</div>
         <div class="k sym" data-t="⌫">⌫</div>
       </div>
@@ -113,7 +115,7 @@
   <!-- ဆက်တင် -->
   <section class="sec" id="sec-settings">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
-    <div class="setrow"><span>App Version</span><b>v11</b></div>
+    <div class="setrow"><span>App Version</span><b>v12</b></div>
     <div class="setrow"><span>Agent code</span><b id="agentCodeShow">—</b></div>
     <div class="setrow"><span>Server Sync</span><button class="sbtn" id="syncNowBtn">Sync</button></div>
     <div class="status" id="syncStatus"></div>
@@ -162,6 +164,6 @@
 <!-- All static elements must stay ABOVE these scripts: app.js wires buttons at load time, so anything below never gets listeners (lineMenu buttons were dead, Oct 25). -->
 <script src="../parser3d.js?v=23"></script>
 <script src="../sync3d.js?v=3"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>
