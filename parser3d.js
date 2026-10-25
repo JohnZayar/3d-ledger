@@ -1,4 +1,8 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v25 (Pho, Oct 25): digit + ဘရိတ် = numbers whose digits
+ * sum to a number ending in that digit (sum mod 10) — every form
+ * is 100 numbers; 10ဘရိတ် = 0ဘရိတ် (sums 0/10/20); bare ဘရိတ်
+ * = 1ဘရိတ် (sums 1/11/21).
  * Parser v24 (Pho, Oct 25): ဘရိတ် = ပွင့် = numbers whose digits
  * sum to 1, 11, or 21 (3 + 69 + 28 = 100 numbers).
  * Parser v23 (Pho, Oct 25): digit + အပါ = all 3-digit numbers
@@ -321,6 +325,17 @@
           if (ans.indexOf(ad) !== -1) outA.push(ans);
         }
         return { nums: outA, len: mm[0].length, bareOk: true };
+      }
+      // Digit + digit-sum set (Pho, Oct 25): Nဘရိတ် = numbers whose
+      // digits sum to a number ending in N (sum mod 10) — 100 each;
+      // 10 counts as 0 (10ဘရိတ် = 0ဘရိတ်, sums 0/10/20).
+      mm = str.match(/^(10|\d)(ဘရိတ်|ပွင့်)/);
+      if (mm) {
+        var dd = parseInt(mm[1], 10) % 10, outD = [], di, dj, dk;
+        for (di = 0; di < 10; di++) for (dj = 0; dj < 10; dj++) for (dk = 0; dk < 10; dk++) {
+          if ((di + dj + dk) % 10 === dd) outD.push('' + di + dj + dk);
+        }
+        return { nums: outD, len: mm[0].length, bareOk: true };
       }
       // Digit-sum set (Pho, Oct 25): ဘရိတ် = ပွင့် = numbers whose
       // digits sum to 1, 11, or 21 (3 + 69 + 28 = 100 numbers).
