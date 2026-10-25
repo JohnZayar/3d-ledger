@@ -1,4 +1,4 @@
-/* 3D Agent v8 — local-first + server sync (sync3d).
+/* 3D Agent v9 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
    Separateness (Pho Oct 24, သတ်သတ်စီ): this app shows ONLY its
    own bettors — never Master people, never other agents' bettors,
@@ -330,7 +330,10 @@
 
   /* Long-press a preview/badbox row to delete that board line (Pho, Oct 24):
      hold ~0.5s on a row and the line is gone — no confirm, like the
-     competitor apps. Rows carry their board line index in data-idx. */
+     competitor apps. Rows carry their board line index in data-idx.
+     A small finger tremor (<=12px) must NOT cancel the hold — only a
+     real drag/scroll does (Pho, Oct 25: plain pointermove cancel was
+     too eager and the hold never fired). */
   function deleteBoardLine(li) {
     var ls = $('board').value.split('\n');
     if (li < 0 || li >= ls.length) return;
@@ -340,15 +343,21 @@
     $('board').focus();
   }
   function bindRowDelete(el) {
-    var timer = null;
+    var timer = null, sx = 0, sy = 0;
     el.addEventListener('pointerdown', function (e) {
       var row = e.target.closest ? e.target.closest('[data-idx]') : null;
       if (!row) return;
       var li = parseInt(row.getAttribute('data-idx'), 10);
+      sx = e.clientX || 0; sy = e.clientY || 0;
       timer = setTimeout(function () { timer = null; deleteBoardLine(li); }, 500);
     });
-    ['pointerup', 'pointerleave', 'pointercancel', 'pointermove'].forEach(function (ev) {
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
       el.addEventListener(ev, function () { if (timer) { clearTimeout(timer); timer = null; } });
+    });
+    el.addEventListener('pointermove', function (e) {
+      if (!timer) return;
+      var dx = (e.clientX || 0) - sx, dy = (e.clientY || 0) - sy;
+      if (dx * dx + dy * dy > 144) { clearTimeout(timer); timer = null; }
     });
     el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   }
