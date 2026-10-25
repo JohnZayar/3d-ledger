@@ -1,4 +1,4 @@
-/* 3D Master v56 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
+/* 3D Master v57 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -428,6 +428,8 @@
     $('lastTotal').textContent = fmt(last);
   }
   $('board').addEventListener('input', parseBoard);
+  $('board').addEventListener('input', hideExcl);
+  $('entryPerson').addEventListener('change', hideExcl);
 
   /* Long-press a preview/badbox row to delete that board line (Pho, Oct 24):
      hold ~0.5s on a row and the line is gone — no confirm, like the
@@ -605,7 +607,26 @@
     s.closed = !s.closed; Q('update', '3d_sessions', s.id, s); save(); renderCloseToggle(); render();
   });
 
+  $('exclSaveBtn').addEventListener('click', function () {
+    if (!exclPending) return;
+    var nums = exclPending.all || [exclPending.n];
+    hideExcl();
+    var out = $('board').value.split('\n').map(function (ln) {
+      var r = parseLine(ln);
+      if (!r.ok) return ln;
+      var hit = r.items.filter(function (it) { return nums.indexOf(it.number) >= 0; }).map(function (it) { return it.number; });
+      var uniq = hit.filter(function (x, i) { return hit.indexOf(x) === i; });
+      if (!uniq.length) return ln;
+      return ln + '{-' + uniq.join('/') + '}';
+    });
+    $('board').value = out.join('\n');
+    parseBoard();
+    if (!lastParse.every(function (r) { return r.ok; })) { $('entryStatus').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
+    $('saveBtn').click();
+  });
+
   $('saveBtn').addEventListener('click', function () {
+    hideExcl();
     if (winLocked()) { $('entryStatus').textContent = lockPrefix() + ' — ထိုး မရတော့ပါ'; return; }
     var pid = $('entryPerson').value;
     if (!pid) return;
@@ -615,11 +636,7 @@
     var newItems = [];
     valid.forEach(function (r) { r.items.forEach(function (it) { newItems.push(it); }); });
     var badC = closedViolation(pid, newItems, null);
-    if (badC) {
-      $('entryStatus').textContent = '\u1015\u102d\u1010\u103a\u1002\u100f\u1014\u103a\u1038 ' + badC.n + ' \u2014 ' + person(pid).name +
-        ' limit ' + fmt(badC.cap) + ' \u1000\u103b\u1031\u102c\u103a \u1019\u101a\u103a (' + fmt(badC.tot) + ' \u1016\u103c\u1005\u103a \u1014\u1031)' + exclHint(badC);
-      return;
-    }
+    if (badC) { showExcl(badC); return; }
     var batchNo = 1;
     sessRecords().forEach(function (r) {
       if (r.personId === pid && r.batchNo >= batchNo) batchNo = r.batchNo + 1;
@@ -938,8 +955,8 @@
     if (!r.ok) { $('lmHint').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
     var badL = closedViolation(recs[0].personId, r.items, menuLineId);
     var badA = recs[0].agentId ? agentClosedViolation(recs[0].agentId, r.items, menuLineId) : null;
-    if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' limit ' + fmt(badA.cap) + ' ကျော် နေတယ် (Agent စုစုပေါင်း)' + exclHintShort(badA); return; }
-    if (badL) { $('lmHint').textContent = '\u1015\u102d\u1010\u103a\u1002\u100f\u1014\u103a\u1038 ' + badL.n + ' limit ' + fmt(badL.cap) + ' \u1000\u103b\u1031\u102c\u103a \u1019\u101a\u103a' + exclHintShort(badL); return; }
+    if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + (badA.all || [badA.n]).join('/') + exclTag(badA); return; }
+    if (badL) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + (badL.all || [badL.n]).join('/') + exclTag(badL); return; }
     var first = recs[0];
     var idx = state.records.indexOf(first);
     state.records = state.records.filter(function (x) { return x.lineId !== menuLineId; });
@@ -1055,9 +1072,16 @@
   });
   // Per-person closed-number cap: ONLY for numbers on the Home closed
   // list, ONLY when the person has a limit set (blank = no limit).
-  // Block message: show the exclusion the bettor must write (Pho Oct 25).
-  function exclHint(bad) { return ' {-'+(bad.all || [bad.n]).join('/')+'} ဖယ်ထုတ်ပြီး ပြန်ထိုးပါ'; }
-  function exclHintShort(bad) { return ' {-'+(bad.all || [bad.n]).join('/')+'} ဖယ်ထုတ်ပါ'; }
+  // Block UI (Pho Oct 25): short message + one-tap exclude-and-save.
+  // No long explanation (Pho: 'စာတွေများလွန်းတယ်, Appရှုပ်တယ်').
+  var exclPending = null;
+  function exclTag(bad) { return ' {-'+(bad.all || [bad.n]).join('/')+'}'; }
+  function hideExcl() { exclPending = null; var b = $('exclSaveBtn'); if (b) b.style.display = 'none'; }
+  function showExcl(bad) {
+    exclPending = bad;
+    $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + (bad.all || [bad.n]).join('/');
+    var b = $('exclSaveBtn'); if (b) b.style.display = '';
+  }
   function closedViolation(pid, items, excludeLineId) {
     var p = person(pid);
     if (!p || p.closedLimit == null) return null;
