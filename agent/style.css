@@ -168,3 +168,12 @@ table.vt tr.vtote td { background: #2e2a0d; }
 table.vt tr.vtote td.frm { color: #cdd2d9; }
 .xgrid span.w { background: #3a1414; border-color: #e04848; color: #ff8f8f; }
 .xgrid span.t { background: #2b3038; border-color: #a5aab6; color: #cdd2d9; }
+
+/* Agent color pass (Pho Oct 25, v15): silver stays the brand, but
+   restrained accents so the app no longer reads as all-grey —
+   blue/green/gold tile icons, gold home total, green Save. */
+.tile[data-go="people"] svg { stroke: #8fb8e8; }
+.tile[data-go="voucher"] svg { stroke: #7ed491; }
+.tile[data-go="daily"] svg { stroke: #e8c84a; }
+.total .tamt b { color: #e8c84a; }
+#saveBtn { background: #43a673; color: #fff; }
