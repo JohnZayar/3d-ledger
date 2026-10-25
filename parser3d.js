@@ -1,8 +1,11 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v26 (Pho, Oct 25): bare ဘရိတ် REMOVED — bare ဘရိတ် does
+ * not exist ('အလွတ်ဘရိတ်မရှိဖျက်'); digit + ဘရိတ် ONLY
+ * (1ဘရိတ်…9ဘရိတ်, 0/10ဘရိတ်; digit + ပွင့် likewise).
  * Parser v25 (Pho, Oct 25): digit + ဘရိတ် = numbers whose digits
  * sum to a number ending in that digit (sum mod 10) — every form
  * is 100 numbers; 10ဘရိတ် = 0ဘရိတ် (sums 0/10/20); bare ဘရိတ်
- * = 1ဘရိတ် (sums 1/11/21).
+ * = 1ဘရိတ် (sums 1/11/21) — SUPERSEDED by v26 (bare removed).
  * Parser v24 (Pho, Oct 25): ဘရိတ် = ပွင့် = numbers whose digits
  * sum to 1, 11, or 21 (3 + 69 + 28 = 100 numbers).
  * Parser v23 (Pho, Oct 25): digit + အပါ = all 3-digit numbers
@@ -337,17 +340,8 @@
         }
         return { nums: outD, len: mm[0].length, bareOk: true };
       }
-      // Digit-sum set (Pho, Oct 25): ဘရိတ် = ပွင့် = numbers whose
-      // digits sum to 1, 11, or 21 (3 + 69 + 28 = 100 numbers).
-      mm = str.match(/^ဘရိတ်|^ပွင့်/);
-      if (mm) {
-        var outB = [], bi, bj, bk, bsum;
-        for (bi = 0; bi < 10; bi++) for (bj = 0; bj < 10; bj++) for (bk = 0; bk < 10; bk++) {
-          bsum = bi + bj + bk;
-          if (bsum === 1 || bsum === 11 || bsum === 21) outB.push('' + bi + bj + bk);
-        }
-        return { nums: outB, len: mm[0].length, bareOk: true };
-      }
+      // NOTE (Pho, Oct 25): bare ဘရိတ် / ပွင့် does NOT exist — the
+      // bare branch was removed in v26; digit + ဘရိတ် ONLY.
       mm = str.match(/^(\d)(\d)\s*(ထိပ်|ရှေ့|အလယ်|အလည်|လယ်|နောက်)စီးရီး/);
       if (mm) {
         var a = mm[1], b = mm[2], out = [];
