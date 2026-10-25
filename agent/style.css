@@ -177,3 +177,7 @@ table.vt tr.vtote td.frm { color: #cdd2d9; }
 .tile[data-go="daily"] svg { stroke: #e8c84a; }
 .total .tamt b { color: #e8c84a; }
 #saveBtn { background: #43a673; color: #fff; }
+
+/* Exclude-and-save button (Pho Oct 25, v17): blue-slate, distinct
+   from the green Save; shown only when a line is blocked. */
+#exclSaveBtn { background: #2b3242; border: 1px solid #8fb8e8; color: #cfd6e4; }
