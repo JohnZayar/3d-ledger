@@ -1,4 +1,4 @@
-/* 3D Agent v15 — local-first + server sync (sync3d).
+/* 3D Agent v16 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
    Separateness (Pho Oct 24, သတ်သတ်စီ): this app shows ONLY its
    own bettors — never Master people, never other agents' bettors,
@@ -400,6 +400,9 @@
   function winLocked() { var s = sess(); return !!(s && (s.winning || s.closed)); }
   function lockPrefix() { var s = sess(); return (s && s.winning) ? 'ပေါက်သီး ထည့်ပြီး' : 'ပွဲစဉ် ပိတ်ထားသည်'; }
 
+  // Block message: show the exclusion the bettor must write (Pho Oct 25).
+  function exclHint(bad) { return ' {-'+(bad.all || [bad.n]).join('/')+'} ဖယ်ထုတ်ပြီး ပြန်ထိုးပါ'; }
+  function exclHintShort(bad) { return ' {-'+(bad.all || [bad.n]).join('/')+'} ဖယ်ထုတ်ပါ'; }
   function closedViolation(pid, items, excludeLineId) {
     var p = person(pid);
     if (!p || p.closedLimit == null) return null;
@@ -416,11 +419,12 @@
       if (excludeLineId && r.lineId === excludeLineId) return;
       if (list.indexOf(r.number) >= 0) existing[r.number] = (existing[r.number] || 0) + r.amount;
     });
-    var bad = null;
+    var bad = null, all = [];
     Object.keys(sums).forEach(function (n) {
       var tot = (existing[n] || 0) + sums[n];
-      if (tot > p.closedLimit && !bad) bad = { n: n, cap: p.closedLimit, tot: tot };
+      if (tot > p.closedLimit) { if (!bad) bad = { n: n, cap: p.closedLimit, tot: tot }; all.push(n); }
     });
+    if (bad) bad.all = all;
     return bad;
   }
   // Agent aggregate hot-limit (Pho Oct 24): the agent-person's
@@ -442,11 +446,12 @@
       if (excludeLineId && r.lineId === excludeLineId) return;
       if (list.indexOf(r.number) >= 0) existing[r.number] = (existing[r.number] || 0) + r.amount;
     });
-    var bad = null;
+    var bad = null, all = [];
     Object.keys(sums).forEach(function (n) {
       var tot = (existing[n] || 0) + sums[n];
-      if (tot > ap.closedLimit && !bad) bad = { n: n, cap: ap.closedLimit, tot: tot };
+      if (tot > ap.closedLimit) { if (!bad) bad = { n: n, cap: ap.closedLimit, tot: tot }; all.push(n); }
     });
+    if (bad) bad.all = all;
     return bad;
   }
 
@@ -463,10 +468,10 @@
     if (!sp || sp.role === 'agent' || sp.agentId !== state.agentCode) { $('entryStatus').textContent = 'ဒီလူကို ရွေးလို့ မရပါ'; return; }
     var badC = closedViolation(pid, newItems, null);
     var badA = agentClosedViolation(state.agentCode, newItems, null);
-    if (badA) { $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' — Agent စုစုပေါင်း limit ' + fmt(badA.cap) + ' ကျော် နေတယ် (' + fmt(badA.tot) + ' ဖက် နေ)'; return; }
+    if (badA) { $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' — Agent စုစုပေါင်း limit ' + fmt(badA.cap) + ' ကျော် နေတယ် (' + fmt(badA.tot) + ' ဖက် နေ)' + exclHint(badA); return; }
     if (badC) {
       $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + badC.n + ' — ' + person(pid).name +
-        ' limit ' + fmt(badC.cap) + ' ကျော် နေတယ် (' + fmt(badC.tot) + ' ဖက် နေ)';
+        ' limit ' + fmt(badC.cap) + ' ကျော် နေတယ် (' + fmt(badC.tot) + ' ဖက် နေ)' + exclHint(badC);
       return;
     }
     var batchNo = 1;
@@ -622,8 +627,8 @@
     if (!r.ok) { $('lmHint').textContent = 'ပုံစံ မမှန် — ပြန် စစ် ပါ'; return; }
     var badL = closedViolation(recs[0].personId, r.items, menuLineId);
     var badA = recs[0].agentId ? agentClosedViolation(recs[0].agentId, r.items, menuLineId) : null;
-    if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' Agent စုစုပေါင်း limit ' + fmt(badA.cap) + ' ကျော် နေတယ်'; return; }
-    if (badL) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badL.n + ' limit ' + fmt(badL.cap) + ' ကျော် နေတယ်'; return; }
+    if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badA.n + ' Agent စုစုပေါင်း limit ' + fmt(badA.cap) + ' ကျော် နေတယ်' + exclHintShort(badA); return; }
+    if (badL) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + badL.n + ' limit ' + fmt(badL.cap) + ' ကျော် နေတယ်' + exclHintShort(badL); return; }
     var first = recs[0];
     var idx = state.records.indexOf(first);
     state.records = state.records.filter(function (x) { return x.lineId !== menuLineId; });
