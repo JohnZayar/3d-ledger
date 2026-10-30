@@ -1,4 +1,4 @@
-/* 3D Master v58 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
+/* 3D Master v60 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -347,6 +347,10 @@
   }
 
   /* ---------- people ---------- */
+  // Master agent entry (Pho Oct 31): the already-registered agent
+  // rows (role 'agent' terms rows) offered as entry substitutes, so
+  // Master can enter message-sent bets under just the agent name.
+  function entryAgentRows() { return state.people.filter(function (p) { return p.role === 'agent'; }); }
   function renderPeople() {
     // entry + voucher dropdowns — Master's own people ONLY. Agent
     // bettors never list here (privacy rule); the voucher dropdown
@@ -360,7 +364,10 @@
     }).join('');
     var ep = $('entryPerson'), vp = $('voucherPerson');
     var keepE = ep.value, keepV = vp.value;
-    ep.innerHTML = vis.length ? opts : '<option value="">—</option>';
+    var agentEntryOpts = entryAgentRows().map(function (p) {
+      return '<option value="' + p.id + '">' + esc('(Agent) ' + p.name) + '</option>';
+    }).join('');
+    ep.innerHTML = (vis.length || agentEntryOpts) ? (opts + agentEntryOpts) : '<option value="">—</option>';
     restoreSel(ep, keepE);
     vp.innerHTML = (vis.length || agentOpts) ? (opts + agentOpts) : '<option value="">—</option>';
     restoreSel(vp, keepV);
@@ -452,7 +459,7 @@
     } else bb.style.display = 'none';
     $('saveBtn').disabled = !(valid.length && $('entryPerson').value);
     if (valid.length && !$('entryPerson').value) {
-      $('entryStatus').textContent = visiblePeople().length
+      $('entryStatus').textContent = (visiblePeople().length || entryAgentRows().length)
         ? 'အရင် လူ ရွေးပါ'
         : 'လူ မရှိသေး — လူစာရင်း မှာ အရင် ထည့်ပါ';
     } else if ($('entryStatus').textContent.indexOf('လူ') === 0 || $('entryStatus').textContent.indexOf('အရင်') === 0) {
@@ -675,7 +682,12 @@
     var s = sess();
     var newItems = [];
     valid.forEach(function (r) { r.items.forEach(function (it) { newItems.push(it); }); });
-    var badC = closedViolation(pid, newItems, null);
+    // Master agent entry (Pho Oct 31): selecting an agent row enters
+    // under the agent name — no bettor split. The aggregate cap
+    // (agentClosedViolation) applies, not the per-person check.
+    var selPerson = person(pid);
+    var selAgentCode = (selPerson && selPerson.agentId) || null;
+    var badC = selAgentCode ? agentClosedViolation(selAgentCode, newItems, null) : closedViolation(pid, newItems, null);
     if (badC) { showExcl(badC); return; }
     var batchNo = 1;
     sessRecords().forEach(function (r) {
@@ -687,7 +699,8 @@
         var rec = {
           id: uid(), sessionId: s.id, personId: pid, batchNo: batchNo,
           lineId: lineId, number: it.number, amount: it.amount,
-          formula: r.formula, isFormula: r.kind !== 'single'
+          formula: r.formula, isFormula: r.kind !== 'single',
+          agentId: selAgentCode
         };
         state.records.push(rec);
         Q('create', '3d_records', rec.id, rec);
@@ -1461,15 +1474,31 @@
     .catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
   }
   function deleteAgent(aid, code, tidArg) {
-    if (!confirm('ဒီ agent (' + code + ') ကို အပြီးဖျက်မလား?')) return;
+    if (!confirm('ဒီ agent (' + code + ') ကို အပြီးဖျက်မလား? သူ့လူတွေပါ အတွဲလိုက် ပျက်မယ်။')) return;
     var n = agentNumFromCode(code);
     var tid = tidArg;
-    var job = Promise.resolve();
+    // Cascade (Pho Oct 31): deleting an agent deletes its whole set --
+    // every 3d_people row with this agentId (bettors + the agent's own
+    // terms row) -- FIRST. If any people delete fails, abort before
+    // touching the login or agent row, so no new orphans are created.
+    // Records stay (ledger history, not people).
+    var job = pbList('3d_people', { filter: 'agentId="' + code + '"', perPage: 200 }).then(function (res) {
+      var rows = res.items || [];
+      var chain = Promise.resolve();
+      rows.forEach(function (row) {
+        chain = chain.then(function () {
+          return pbReq('DELETE', '/collections/3d_people/records/' + encodeURIComponent(row.id));
+        });
+      });
+      return chain;
+    });
     if (tid && n) {
-      job = pbList('users', { filter: 'email="' + agent3dEmail(tid, n) + '"', perPage: 5 }).then(function (res) {
-        var u = (res.items || [])[0];
-        if (u) return pbReq('DELETE', '/collections/users/records/' + u.id).catch(function () {});
-      }).catch(function () {});
+      job = job.then(function () {
+        return pbList('users', { filter: 'email="' + agent3dEmail(tid, n) + '"', perPage: 5 }).then(function (res) {
+          var u = (res.items || [])[0];
+          if (u) return pbReq('DELETE', '/collections/users/records/' + u.id).catch(function () {});
+        }).catch(function () {});
+      });
     }
     job.then(function () {
       return pbReq('DELETE', '/collections/3d_agents/records/' + encodeURIComponent(aid));
