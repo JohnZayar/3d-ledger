@@ -231,6 +231,7 @@
     ep.innerHTML = opts + '<option value="__new__">+ လူသစ်…</option>';
     if (keepE && (keepE === '__new__' || person(keepE))) ep.value = keepE;
     if (ep.value === '__new__') entryNewPersonShow(true); else entryNewPersonShow(false);
+    renderEntryPersonPanel();
     vp.innerHTML = state.people.length ? opts : '<option value="">—</option>';
     if (keepV && person(keepV)) vp.value = keepV;
     $('peopleList').innerHTML = agentVisiblePeople().map(function (p) {
@@ -327,7 +328,41 @@
     parseBoard();
   }
 
-  /* ---------- entry board ---------- */
+    /* ---------- entry person dropdown panel (Pho Oct 31, 2D-style) ----------
+     The entry person field is a bar with a down-arrow that drops a panel
+     directly UNDER it (in-flow, scrollable) -- not the phone's centered
+     native-select popup. The hidden native <select> stays the single
+     source of truth: panel rows only set its value and run the same
+     change path (hideExcl + onEntryPersonChange + parseBoard). */
+  function renderEntryPersonPanel() {
+    var sel = $('entryPerson'), field = $('entryPersonField'), panel = $('entryPersonPanel');
+    if (!sel || !field || !panel) return;
+    var cur = sel.value || '', curName = '';
+    Array.prototype.forEach.call(sel.options, function (o) {
+      if (o.value === cur && o.value !== '__new__') curName = o.textContent;
+    });
+    field.textContent = (curName || '-- လူ ရွေးပါ --') + ' \u25be';
+    var html = '<div class="pp-new" data-pick="__new__">+ လူသစ်…</div>';
+    Array.prototype.forEach.call(sel.options, function (o) {
+      if (!o.value || o.value === '__new__') return;
+      html += '<div class="pp-row' + (o.value === cur ? ' cur' : '') + '" data-pick="' + esc(o.value) + '">' + esc(o.textContent) + '</div>';
+    });
+    panel.innerHTML = html;
+  }
+  function toggleEntryPersonPanel() {
+    var panel = $('entryPersonPanel'); if (!panel) return;
+    if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+    renderEntryPersonPanel(); panel.style.display = 'block';
+  }
+  function pickEntryPerson(val) {
+    var sel = $('entryPerson'); if (!sel) return;
+    sel.value = val;
+    hideExcl(); onEntryPersonChange(); parseBoard();
+    var panel = $('entryPersonPanel'); if (panel) panel.style.display = 'none';
+    renderEntryPersonPanel();
+  }
+
+/* ---------- entry board ---------- */
   var lastParse = [];
   function parseBoard() {
     var lines = $('board').value.split('\n');
@@ -388,6 +423,17 @@
   $('board').addEventListener('input', hideExcl);
   $('entryPerson').addEventListener('change', hideExcl);
   $('entryPerson').addEventListener('change', onEntryPersonChange);
+  $('entryPersonField').addEventListener('click', toggleEntryPersonPanel);
+  $('entryPersonPanel').addEventListener('click', function (e) {
+    var t = (e.target && e.target.closest) ? e.target.closest('[data-pick]') : null;
+    if (t) pickEntryPerson(t.getAttribute('data-pick'));
+  });
+  document.addEventListener('click', function (ev) {
+    var panel = $('entryPersonPanel'), field = $('entryPersonField');
+    if (panel && panel.style.display === 'block' && ev.target && ev.target.closest) {
+      if (!panel.contains(ev.target) && field && !field.contains(ev.target)) panel.style.display = 'none';
+    }
+  });
   $('entryNewPersonOk').addEventListener('click', confirmEntryNewPerson);
   $('entryNewPersonCancel').addEventListener('click', cancelEntryNewPerson);
 
