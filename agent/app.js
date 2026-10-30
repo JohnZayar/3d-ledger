@@ -423,8 +423,8 @@
   $('board').addEventListener('input', hideExcl);
   $('entryPerson').addEventListener('change', hideExcl);
   $('entryPerson').addEventListener('change', onEntryPersonChange);
-  $('entryPersonField').addEventListener('click', toggleEntryPersonPanel);
-  $('entryPersonPanel').addEventListener('click', function (e) {
+  on('entryPersonField', 'click', toggleEntryPersonPanel);
+  on('entryPersonPanel', 'click', function (e) {
     var t = (e.target && e.target.closest) ? e.target.closest('[data-pick]') : null;
     if (t) pickEntryPerson(t.getAttribute('data-pick'));
   });
