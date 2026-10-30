@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="style.css?v=38">
+<link rel="stylesheet" href="style.css?v=39">
 </head>
 <body>
 <div class="app">
@@ -45,7 +45,8 @@
 
   <!-- ထိုးကွက် တင် -->
   <section class="sec" id="sec-entry">
-    <div class="backrow ehead"><span class="back" data-go="home">&larr;</span><select class="inp" id="entryPerson"></select><button class="kbt" id="kbToggle" type="button">⌨</button></div>
+    <div class="backrow ehead"><span class="back" data-go="home">&larr;</span><div class="inp" id="entryPersonField">-- လူ ရွေးပါ -- ▾</div><select id="entryPerson" style="display:none"></select><button class="kbt" id="kbToggle" type="button">⌨</button></div>
+    <div id="entryPersonPanel" style="display:none"></div>
     <div id="entryNewPersonInline" style="display:none;gap:6px;margin:6px 0"><input class="inp" id="entryNewPersonName" placeholder="လူသစ် နာမည်"><button class="btn" id="entryNewPersonOk" type="button">အတည်</button><button class="btn" id="entryNewPersonCancel" type="button">မလုပ်တော့</button></div>
     <textarea class="ta board" id="board" inputmode="none" placeholder="123@500"></textarea>
     <div class="boardbar"><span>Last: <b id="lastTotal">0</b></span><span><b id="boardCount">0</b> ကွက် · Total <b id="boardTotal">0</b></span></div>
@@ -111,7 +112,7 @@
   <!-- ဆက်တင် -->
   <section class="sec" id="sec-settings">
     <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
-    <div class="setrow"><span>App Version</span><b>v20</b></div>
+    <div class="setrow"><span>App Version</span><b>v21</b></div>
     <div class="setrow"><span>Agent code</span><b id="agentCodeShow">—</b></div>
     <div class="setrow"><span>Server Sync</span><button class="sbtn" id="syncNowBtn">Sync</button></div>
     <div class="status" id="syncStatus"></div>
@@ -159,6 +160,6 @@
 <!-- All static elements must stay ABOVE these scripts: app.js wires buttons at load time, so anything below never gets listeners (lineMenu buttons were dead, Oct 25). -->
 <script src="../parser3d.js?v=28"></script>
 <script src="../sync3d.js?v=4"></script>
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>
