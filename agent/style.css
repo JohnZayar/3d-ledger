@@ -154,6 +154,13 @@ table.grid.akan th { background: #3a2323; }
 .backrow.ehead select { flex: 1; min-width: 0; }
 .backrow.ehead h2 { white-space: nowrap; }
 .backrow.ehead .kbt { align-self: stretch; }
+/* Entry person dropdown panel (Pho Oct 31, 2D-style): field bar + panel
+   dropping directly under it, not the phone's centered native popup. */
+.backrow.ehead #entryPersonField { flex: 1; min-width: 0; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#entryPersonPanel { border: 1px solid #3a3b41; border-radius: 10px; background: #232429; margin-bottom: 9px; max-height: 260px; overflow: auto; }
+#entryPersonPanel .pp-new { padding: 11px 12px; border-bottom: 1px solid #3a3b41; font-weight: 700; color: #e8c56b; cursor: pointer; }
+#entryPersonPanel .pp-row { padding: 11px 12px; border-bottom: 1px solid #2a2b31; cursor: pointer; }
+#entryPersonPanel .pp-row.cur { background: #2f2a1a; font-weight: 700; }
 
 /* Win/tote ledger highlights (Pho Oct 24): winner RED, tote set YELLOW */
 .cell.tote { border-color: #a5aab6; background: #2b3038; }
