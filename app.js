@@ -134,20 +134,60 @@
   // row only resets terms (auto-create re-adds it blank). The
   // agent ACCOUNT itself is never touched here.
   function agentPersonFor(code) { return state.people.find(function (p) { return p.role === 'agent' && p.agentId === code; }); }
+  // Pho Oct 30 fix (login-duplication race): refreshAgentNames can
+  // run ensureAgentPeople BEFORE the pull lands server people on a
+  // fresh state, so the local-only check missed real rows and
+  // created blank (0-term) duplicates. Codes missing locally are
+  // now checked against SERVER 3d_people first: a server row is
+  // adopted locally, never re-created blank; only a code with no
+  // server row is created. One check runs at a time (shared
+  // promise) so concurrent callers cannot double-create. A failed
+  // check creates nothing (fail-closed); the next sync retries.
+  // Existing rows are never touched.
+  var agentPeopleServerCheck = null;
   function ensureAgentPeople() {
     if (!window.Sync3D || !window.Sync3D.isLoggedIn()) return 0;
     var myTenant = ownTenant();
-    var created = 0;
+    var missing = [];
     (agentRecords || []).forEach(function (it) {
       var tid = (typeof it.tenant === 'string') ? it.tenant : (it.tenant && it.tenant.id);
       if (myTenant && tid && tid !== myTenant) return; // Pho-exception fetch may include other tenants
       if (agentPersonFor(it.code)) return;
-      var np = { id: uid(), name: it.name || agentName(it.code), role: 'agent', payout: 0, tote: 0, commission: 0, closedLimit: null, agentId: it.code };
-      state.people.push(np);
-      Q('create', '3d_people', np.id, np);
-      created++;
+      if (missing.indexOf(it.code) === -1) missing.push(it.code);
     });
-    return created;
+    if (!missing.length) return 0;
+    if (agentPeopleServerCheck) return 0; // a check is already running; it covers these codes
+    var tok = null;
+    try { var a = JSON.parse(localStorage.getItem('3dMasterAuth') || 'null'); tok = a && a.token; } catch (e) {}
+    if (!tok) return 0;
+    var url = 'https://2d.skylinkvpn.stream/api/collections/3d_people/records?perPage=200';
+    if (myTenant) url += '&filter=' + encodeURIComponent('tenant="' + myTenant + '"');
+    function done() { agentPeopleServerCheck = null; }
+    agentPeopleServerCheck = fetch(url, { headers: { Authorization: tok } })
+      .then(function (res) { return res.json(); })
+      .then(function (d) {
+        var serverByCode = {};
+        (d.items || []).forEach(function (row) { if (row.agentId) serverByCode[row.agentId] = row; });
+        var changed = false;
+        (agentRecords || []).forEach(function (it) {
+          if (missing.indexOf(it.code) === -1) return;
+          if (agentPersonFor(it.code)) return;
+          var srv = serverByCode[it.code];
+          if (srv) {
+            state.people.push({ id: srv.id, name: srv.name, payout: srv.payout, tote: srv.tote || 0, commission: srv.commission, closedLimit: (srv.closedLimit == null ? null : srv.closedLimit), role: srv.role || 'agent', agentId: srv.agentId });
+            changed = true;
+          } else {
+            var np = { id: uid(), name: it.name || agentName(it.code), role: 'agent', payout: 0, tote: 0, commission: 0, closedLimit: null, agentId: it.code };
+            state.people.push(np);
+            Q('create', '3d_people', np.id, np);
+            changed = true;
+          }
+        });
+        if (changed) { save(); render(); }
+        done();
+      })
+      .catch(function () { done(); });
+    return 0;
   }
   function refreshAgentNames() {
     if (!window.Sync3D || !window.Sync3D.isLoggedIn()) return;
