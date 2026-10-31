@@ -1,4 +1,4 @@
-/* Sync3D v1 (Pho Oct 24) — shared by 3D Master + 3D Agent.
+/* Sync3D v2 (Pho Oct 31) — shared by 3D Master + 3D Agent.
    Plain script, no modules (the 3D apps are plain-script apps).
    Mirrors the Pho-approved 2D sync-simple design, adapted for 3D:
    - Server-ID-only FIFO queue, local id IS the PocketBase record id.
@@ -14,6 +14,9 @@
      records only and NEVER creates sessions (Master owns rounds:
      Agent adopts the server session by date).
    - Agent pulls sessions + people only (never other agents' records).
+   - CLOSE GATE (Pho Oct 31, absolute rule): an Agent op for a closed
+     session never leaves the phone (blocked list, never auto-deleted)
+     and Master never ledgers/acks closed-session arrivals.
    Usage: Sync3D.init({role, authKey, queueKey, metaKey}) then
    Sync3D.queue(op, coll, localId, obj), Sync3D.syncNow(state, saveFn). */
 (function () {
@@ -196,6 +199,7 @@
     if (collection === '3d_sessions') {
       return {
         date: o.date, winning: o.winning || '', closed: !!o.closed,
+        closedAt: (o.closedAt == null ? null : o.closedAt),
         limit: o.limit || 0, blocked: Array.isArray(o.blocked) ? o.blocked : [], tenant: tenant
       };
     }
@@ -222,6 +226,7 @@
     return {
       id: item.id, date: item.date, limit: item.limit || 0,
       winning: item.winning || null, closed: !!item.closed,
+      closedAt: (item.closedAt == null ? null : item.closedAt),
       blocked: Array.isArray(item.blocked) ? item.blocked : []
     };
   }
@@ -236,7 +241,8 @@
     return {
       id: item.id, sessionId: item.sessionId, personId: item.personId, batchNo: item.batchNo,
       lineId: item.lineId, number: item.number, amount: item.amount,
-      formula: item.formula || '', isFormula: !!item.isFormula, agentId: item.agentId || null
+      formula: item.formula || '', isFormula: !!item.isFormula, agentId: item.agentId || null,
+      created: item.created || null
     };
   }
 
@@ -266,7 +272,7 @@
     var ex = (state.sessions || []).find(function (s) { return s.id === srvSession.id; });
     if (ex) {
       ex.date = srvSession.date; ex.limit = srvSession.limit; ex.winning = srvSession.winning;
-      ex.closed = srvSession.closed; ex.blocked = srvSession.blocked;
+      ex.closed = srvSession.closed; ex.closedAt = srvSession.closedAt; ex.blocked = srvSession.blocked;
     } else {
       state.sessions.push(srvSession);
       state.sessions.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
@@ -285,6 +291,72 @@
       if (fields.length) msg += ' [' + fields.join(', ') + ']';
     }
     return msg;
+  }
+
+
+  /* ---------- closed-session blocked list (Pho Oct 31, absolute rule) ----------
+     Agent-only: an op for a closed session NEVER leaves the phone. It moves
+     here (never auto-deleted) so the agent sees exactly what didn't go
+     through, with per-batch detail, until he taps the delete button
+     himself. Key: collection|sessionId|personId|batchNo|op. */
+  function _blockedKey() { return _cfg.queueKey + '_blocked'; }
+  function _blocked() {
+    try { return JSON.parse(localStorage.getItem(_blockedKey()) || '[]'); } catch (e) { return []; }
+  }
+  function _setBlocked(b) { try { localStorage.setItem(_blockedKey(), JSON.stringify(b)); } catch (e) {} }
+  function getBlocked() { return _blocked(); }
+  function removeBlocked(key) {
+    _setBlocked(_blocked().filter(function (g) { return g.key !== key; }));
+    return _blocked();
+  }
+  function _closedSessionIds(state) {
+    var out = {};
+    (state.sessions || []).forEach(function (s) { if (s && s.closed) out[s.id] = 1; });
+    return out;
+  }
+  function _blockGroupKey(entry) {
+    var d = entry.data || {};
+    return [entry.collection, d.sessionId || '', d.personId || '', d.batchNo == null ? '' : d.batchNo, entry.op].join('|');
+  }
+  /* Move one queued op to the blocked list. Returns true when gated
+     (caller must drop the queue entry and NOT push). Creates: the
+     unsent bet leaves the agent's own lists (it never counted).
+     Deletes: the local row is restored from the snapshot, so the
+     agent's view matches Master's ledger (the bet still stands).
+     Deletes queued before snapshots existed (data null) cannot be
+     attributed to a session and are left to push (legacy fail-open). */
+  function _gateClosedOp(state, entry, closedIds) {
+    if (_cfg.role !== 'agent') return false;
+    if (entry.collection !== '3d_records') return false;
+    var d = entry.data || {};
+    if (!d.sessionId || !closedIds[d.sessionId]) return false;
+    var groups = _blocked();
+    var key = _blockGroupKey(entry);
+    var g = null;
+    groups.forEach(function (x) { if (x.key === key) g = x; });
+    if (!g) {
+      g = { key: key, sessionId: d.sessionId, personId: d.personId || null,
+        batchNo: (d.batchNo == null ? null : d.batchNo), op: entry.op, lines: [], created: Date.now() };
+      groups.push(g);
+    }
+    if (entry.op === 'create') {
+      g.lines.push({ lineId: d.lineId || null, number: d.number, amount: d.amount,
+        formula: d.formula || '', isFormula: !!d.isFormula });
+      state.records = (state.records || []).filter(function (r) { return r.id !== entry.localId; });
+    } else if (entry.op === 'delete') {
+      if (d.number !== undefined) {
+        g.lines.push({ lineId: d.lineId || null, number: d.number, amount: d.amount,
+          formula: d.formula || '', isFormula: !!d.isFormula });
+        var snap = { id: entry.localId, sessionId: d.sessionId, personId: d.personId,
+          batchNo: d.batchNo, lineId: d.lineId, number: d.number, amount: d.amount,
+          formula: d.formula || '', isFormula: !!d.isFormula, agentId: d.agentId || null };
+        if (!(state.records || []).find(function (r) { return r.id === snap.id; })) state.records.push(snap);
+      } else {
+        g.lines.push({ lineId: null, number: null, amount: null, formula: '', isFormula: false, unknown: true });
+      }
+    }
+    _setBlocked(groups);
+    return true;
   }
 
   function pushPending(state, saveFn, agentCode) {
@@ -399,6 +471,13 @@
             var seenNow = (_meta().seen || {})['3d_sessions'] || [];
             if (!seenNow.length) return;
           }
+          /* CLOSE GATE (Pho Oct 31): an Agent op for a closed session
+             never leaves the phone — it moves to the blocked list
+             (shown, never auto-deleted) and is dropped from the queue. */
+          if (_gateClosedOp(state, entry, _closedSessionIds(state))) {
+            _setQueue(_queue().filter(function (x) { return x.id !== entry.id; }));
+            return;
+          }
           return pushOne(entry).then(function () {
             _setQueue(_queue().filter(function (x) { return x.id !== entry.id; }));
             pushed++;
@@ -437,6 +516,8 @@
        — that was the v39 bug: pre-sync local data was wiped on the
        second sync because nothing had ever pushed it. */
     var seen = meta.seen || {};
+    var skipped = {};
+    (meta.skippedRecords || []).forEach(function (id) { skipped[id] = 1; });
     var pulled = 0, errors = [];
     var chain = Promise.resolve();
 
@@ -460,8 +541,27 @@
           } else if (coll === '3d_records') {
             items.forEach(function (it) {
               var rec = _fromServerRecord(it);
+              /* CLOSE GATE (Pho Oct 31): a record that first arrives
+                 while its session is closed never enters the ledger
+                 and is never acked — unless it was pushed BEFORE the
+                 close (server created <= closedAt). Remembered, so a
+                 later reopen can never resurrect it. */
+              if (skipped[rec.id]) return;
+              var rsess = (state.sessions || []).find(function (s) { return s.id === rec.sessionId; });
+              if (!rsess || rsess.closed) {
+                var preClose = false;
+                if (rsess && rsess.closed && rsess.closedAt && rec.created) {
+                  var ct = new Date(rec.created).getTime();
+                  if (!isNaN(ct) && ct <= rsess.closedAt) preClose = true;
+                }
+                if (!preClose) { skipped[rec.id] = 1; return; }
+              }
               var ex = (state.records || []).find(function (r) { return r.id === rec.id; });
-              if (ex) Object.assign(ex, rec); else state.records.push(rec);
+              if (ex) {
+                /* Closed session: never apply an update (a post-close
+                   edit must not take effect); keep ledger values. */
+                if (!(rsess && rsess.closed)) Object.assign(ex, rec);
+              } else state.records.push(rec);
               pulled++;
             });
           }
@@ -474,7 +574,14 @@
           _queue().forEach(function (e) { if (e.localId) pending[e.localId] = 1; });
           var listKey = coll === '3d_sessions' ? 'sessions' : coll === '3d_people' ? 'people' : 'records';
           state[listKey] = (state[listKey] || []).filter(function (row) {
-            return serverIds[row.id] || pending[row.id] || !oldSeen[row.id];
+            if (serverIds[row.id] || pending[row.id] || !oldSeen[row.id]) return true;
+            /* CLOSE GATE: a post-close delete must not take effect —
+               keep closed-session rows even when the server row is gone. */
+            if (coll === '3d_records') {
+              var os = (state.sessions || []).find(function (s) { return s.id === row.sessionId; });
+              if (!os || os.closed) return true;
+            }
+            return false;
           });
           seen[coll] = Object.keys(serverIds);
         }).catch(function (err) { errors.push(coll + ': ' + err.message); });
@@ -487,6 +594,7 @@
         if (!cur) state.currentSessionId = state.sessions[0].id;
       }
       meta.seen = seen;
+      meta.skippedRecords = Object.keys(skipped);
       _setMeta(meta);
       _syncing = false;
       if (saveFn) saveFn();
@@ -499,9 +607,22 @@
     });
   }
 
+  /* Sessions first: the close gate needs FRESH closed flags before any
+     push. A failed refresh keeps stale state (push proceeds; the Master
+     pull gate is the backstop) — never block a sync on it. */
+  function refreshSessions(state) {
+    var tenant = getTenant();
+    if (!tenant) return Promise.resolve(false);
+    return _listAll('3d_sessions', { filter: 'tenant="' + tenant + '"' }).then(function (items) {
+      items.forEach(function (it) { _adoptSessionByDate(state, _fromServerSession(it)); });
+      return true;
+    }).catch(function () { return false; });
+  }
   function syncNow(state, saveFn, agentCode) {
     if (_syncing) return Promise.resolve({ push: { skipped: true }, pull: { skipped: true } });
-    return pushPending(state, saveFn, agentCode).then(function (pushRes) {
+    return refreshSessions(state).then(function () {
+      return pushPending(state, saveFn, agentCode);
+    }).then(function (pushRes) {
       return pullUpdates(state, saveFn).then(function (pullRes) {
         return { push: pushRes, pull: pullRes };
       });
@@ -551,6 +672,8 @@
     repushAll: repushAll,
     repushOnce: repushOnce,
     queueCount: function () { return _queue().length; },
+    getBlocked: getBlocked,
+    removeBlocked: removeBlocked,
     pushPending: pushPending,
     pullUpdates: pullUpdates,
     syncNow: syncNow,
