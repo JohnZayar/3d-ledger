@@ -556,8 +556,19 @@
       });
   }
 
-  on('scanBtn', 'click', function () { var sf = $('scanFile'); if (sf) sf.click(); });
-  on('scanFile', 'change', function () {
+  // Scan chooser (Pho, Nov 1): like other scanners — pick Camera or Photo.
+  // Skew-safe: old HTML has no chooser div, so scanBtn falls back to the
+  // plain gallery input, exactly as before.
+  function hideScanChoice() { var c = $('scanChoice'); if (c) c.style.display = 'none'; }
+  on('scanBtn', 'click', function () {
+    var c = $('scanChoice');
+    if (!c) { var sf0 = $('scanFile'); if (sf0) sf0.click(); return; }
+    c.style.display = (c.style.display === 'none' || !c.style.display) ? 'block' : 'none';
+  });
+  on('scanCamBtn', 'click', function () { hideScanChoice(); var sf = $('scanCam'); if (sf) sf.click(); });
+  on('scanPhotoBtn', 'click', function () { hideScanChoice(); var sf = $('scanFile'); if (sf) sf.click(); });
+  on('scanChoiceClose', 'click', hideScanChoice);
+  function onScanPicked() {
     var f = this.files && this.files[0];
     this.value = '';
     if (!f) return;
@@ -575,7 +586,9 @@
     }).catch(function () {
       $('entryStatus').textContent = 'စကန် မရ — internet စစ် ပြီး ပြန် ကြိုး စား ပါ';
     });
-  });
+  }
+  on('scanFile', 'change', onScanPicked);
+  on('scanCam', 'change', onScanPicked);
 
   /* ---------- quick keyboard (same layout as Master) ---------- */
   var kbOpen = false;
