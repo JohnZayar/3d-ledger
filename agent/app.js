@@ -1,4 +1,4 @@
-/* 3D Agent v23 — local-first + server sync (sync3d).
+/* 3D Agent v24 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
    Separateness (Pho Oct 24, သတ်သတ်စီ): this app shows ONLY its
    own bettors — never Master people, never other agents' bettors,
@@ -606,6 +606,29 @@
   });
 
   /* ---------- vouchers ---------- */
+  /* ---------- voucher copy (Pho Oct 31): Copy on a NO row copies that NO batch ---------- */
+  var vcopyTexts = {};
+  function copyVoucherText(text, btn) {
+    var old = btn ? btn.textContent : '';
+    function done(ok) {
+      if (!btn) return;
+      btn.textContent = ok ? 'Copy ပြီး' : 'ကူးမရပါ';
+      setTimeout(function () { btn.textContent = old; }, 1500);
+    }
+    function fallback() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta); done(!!ok);
+      } catch (e) { done(false); }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { fallback(); });
+    } else fallback();
+  }
   $('voucherPerson').addEventListener('change', renderVoucher);
   function toteSetOf(s) {
     if (!s.winning) return null;
@@ -634,12 +657,15 @@
         if (!seen[r.lineId]) { seen[r.lineId] = []; lines.push(seen[r.lineId]); }
         seen[r.lineId].push(r);
       });
-      var body = '', total = 0;
+      var body = '', total = 0, tlines = [];
       lines.forEach(function (lineRecs, li) {
         var lt = lineRecs.reduce(function (a, r) { return a + r.amount; }, 0);
         total += lt;
         var label = esc(lineRecs[0].formula);
         if (lineRecs[0].isFormula || lineRecs.length > 1) label += ' (' + lineRecs.length + ')';
+        var tlabel = lineRecs[0].formula;
+        if (lineRecs[0].isFormula || lineRecs.length > 1) tlabel += ' (' + lineRecs.length + ')';
+        tlines.push(tlabel + ' ' + fmt(lt));
         var xid = 'x' + bn + '-' + li;
         var rowCls = 'vline';
         if (s.winning && lineRecs.some(function (r) { return r.number === s.winning; })) rowCls += ' vwin';
@@ -653,11 +679,18 @@
         body += '<tr id="' + xid + '" style="display:none"><td class="xpand" colspan="2"><div class="xgrid">' + chips + '</div></td></tr>';
       });
       body += '<tr class="vtot"><td colspan="2">Total ' + fmt(total) + '</td></tr>';
+      vcopyTexts[bn] = ($('voucherPerson').selectedOptions[0] ? $('voucherPerson').selectedOptions[0].textContent : '') + '\n' + (s.date || '') + '\nNO ' + bn + '\n' + tlines.join('\n') + '\nTotal ' + fmt(total);
       var okHere = !!state.ackKeys[ackKey(s.id, (rows[0] && rows[0].agentId) || state.agentCode, pid, bn)];
-      html += '<div class="vbatch"><div class="vhead">NO ' + bn + (okHere ? ' <span class="pos">ok</span>' : '') + '</div>' +
+      html += '<div class="vbatch"><div class="vhead">NO ' + bn + (okHere ? ' <span class="pos">ok</span>' : '') + '<button class="vcopy" data-no="' + bn + '" style="float:right;background:#3a3b41;color:#ffd970;border:1px solid #55565e;border-radius:6px;padding:2px 10px;font-size:12px;font-weight:700">Copy</button></div>' +
         '<table class="vt">' + body + '</table></div>';
     });
     box.innerHTML = html;
+    box.querySelectorAll('.vcopy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var t = vcopyTexts[btn.getAttribute('data-no')];
+        if (t) copyVoucherText(t, btn);
+      });
+    });
     box.querySelectorAll('.vline').forEach(function (tr) {
       tr.addEventListener('click', function () {
         if (suppressClick) { suppressClick = false; return; }
