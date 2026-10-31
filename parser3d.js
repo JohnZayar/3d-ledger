@@ -1,4 +1,8 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v28 (Pho, Nov 1): single-number spaced split —
+ * '104=500 R 200' / '104 500r200' / '104 500 R 200' parse as
+ * straight @A + 5 perms @B (6), never listperm 9; placed
+ * before the member loop so no earlier branch is stolen.
  * Parser v27 (Pho, Oct 25): trailing {-...} exclusion — numbers
  * listed after the amount in braces are removed from the expansion:
  * "5ထိပ်5500{-500}" (99 numbers), "5ပွင့် 6500{-447/474/744}"
@@ -282,6 +286,28 @@
       var sAQ = parseInt(m[2], 10);
       if (!(sAQ > 0)) return invalid(raw);
       return finish(subsQ, sAQ, raw, 'list');
+    }
+
+    // Single-number spaced split (Pho, Nov 1): '104=500 R 200',
+    // '104 500r200', '104 500 R 200' — one number, an amount, then a
+    // split marker and a second amount. The member loop below would
+    // misread the amount as a second number and give listperm 9
+    // (104 + 500/050/005 @200); the space forms would fail outright.
+    // Placed AFTER every specific branch and BEFORE the member loop,
+    // so it steals nothing that already parses.
+    m = s.match(/^(\d{3})\s*=\s*(\d+)\s*(?:\u1000\u103b\u1014\u103a\u1021\u102c|\u1000\u103b\u1014\u103a|R|r|\u1021\u102c)\s*(\d+)$/) ||
+        s.match(/^(\d{3})\s+(\d+)\s*(?:\u1000\u103b\u1014\u103a\u1021\u102c|\u1000\u103b\u1014\u103a|R|r|\u1021\u102c)\s*(\d+)$/);
+    if (m) {
+      var dA5 = parseInt(m[2], 10), rA5 = parseInt(m[3], 10);
+      if (!(dA5 > 0) || !(rA5 > 0)) return invalid(raw);
+      var st5 = m[1];
+      var it5 = [{ number: st5, amount: dA5 }];
+      perms3(st5[0], st5[1], st5[2]).forEach(function (pn) {
+        if (pn !== st5) it5.push({ number: pn, amount: rA5 });
+      });
+      var rr5 = finishItems(it5, raw, 'split');
+      rr5.head = 1;
+      return rr5;
     }
 
     // General member-list parser (Pho's symbol canon, Oct 22):
