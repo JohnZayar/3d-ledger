@@ -1,4 +1,4 @@
-/* 3D Master v61 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
+/* 3D Master v62 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -746,8 +746,11 @@
     });
     var totals = totalsByNumber();
     var ltset = toteSetOf(s);
+    // Pho Oct 31 (net total): All Total = net sum over all numbers,
+    // negatives included — an over-hedged number reduces the total, so it
+    // reconciles with home တက်ငွေ. Grid cells still show negatives hed.
     var tSum = 0;
-    Object.keys(totals).forEach(function (k) { if (totals[k] > 0) tSum += totals[k]; });
+    Object.keys(totals).forEach(function (k) { tSum += totals[k]; });
     $('ledTotal').textContent = fmt(tSum);
     // Trade custom (Pho Oct 22): the count is an exposure gauge, NOT a
     // number/line count - akwets = All Total / Limit (floor).
