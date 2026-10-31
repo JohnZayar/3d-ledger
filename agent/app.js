@@ -521,24 +521,32 @@
 
   function shrinkImage(file) {
     return new Promise(function (resolve) {
-      var url, img = new Image();
       var done = false;
       function fin(b) { if (!done) { done = true; resolve(b || file); } }
-      try { url = URL.createObjectURL(file); } catch (e) { return fin(null); }
-      img.onload = function () {
-        try {
-          var max = 1600, w = img.width, hgt = img.height;
-          var sc = Math.min(1, max / Math.max(w, hgt));
-          var cv = document.createElement('canvas');
-          cv.width = Math.round(w * sc); cv.height = Math.round(hgt * sc);
-          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-          if (cv.toBlob) cv.toBlob(function (b) { fin(b); }, 'image/jpeg', 0.85);
-          else fin(null);
-        } catch (e) { fin(null); }
-      };
-      img.onerror = function () { fin(null); };
-      setTimeout(function () { fin(null); }, 4000);
-      img.src = url;
+      function shrinkOnce(src, max, qual, cb) {
+        var url, img = new Image(), ok = false;
+        function fin2(b) { if (!ok) { ok = true; cb(b); } }
+        try { url = URL.createObjectURL(src); } catch (e) { return cb(null); }
+        img.onload = function () {
+          try {
+            var w = img.width, hgt = img.height;
+            var sc = Math.min(1, max / Math.max(w, hgt));
+            var cv = document.createElement('canvas');
+            cv.width = Math.round(w * sc); cv.height = Math.round(hgt * sc);
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            if (cv.toBlob) cv.toBlob(function (b) { fin2(b); }, 'image/jpeg', qual);
+            else fin2(null);
+          } catch (e) { fin2(null); }
+        };
+        img.onerror = function () { fin2(null); };
+        setTimeout(function () { fin2(null); }, 4000);
+        img.src = url;
+      }
+      shrinkOnce(file, 1600, 0.85, function (b1) {
+        if (b1 && b1.size <= 900 * 1024) return fin(b1);
+        // ocr.space free rejects >1MB: shrink harder, never send oversize.
+        shrinkOnce(b1 || file, 1200, 0.7, function (b2) { fin(b2 || b1); });
+      });
     });
   }
 
@@ -549,10 +557,11 @@
     fd.append('OCREngine', '3');
     fd.append('scale', 'true');
     return fetch('https://api.ocr.space/parse/image', { method: 'POST', body: fd })
-      .then(function (res) { return res.json(); })
-      .then(function (d) {
-        if (!d || !d.ParsedResults || !d.ParsedResults.length) throw new Error('ocr');
-        return d.ParsedResults[0].ParsedText || '';
+      .then(function (res) {
+        return res.json().catch(function () { return null; }).then(function (d) {
+          if (!d || !d.ParsedResults || !d.ParsedResults.length || d.IsErroredOnProcessing) throw new Error('ocr-service');
+          return d.ParsedResults[0].ParsedText || '';
+        });
       });
   }
 
@@ -583,8 +592,10 @@
       b.value = (b.value.trim() ? b.value.replace(/\n*$/, '\n') : '') + draft;
       parseBoard();
       $('entryStatus').textContent = 'စကန် ပြီး — ဘုတ် မှာ တိုက် စစ် ပါ';
-    }).catch(function () {
-      $('entryStatus').textContent = 'စကန် မရ — internet စစ် ပြီး ပြန် ကြိုး စား ပါ';
+    }).catch(function (e) {
+      $('entryStatus').textContent = (e && e.message === 'ocr-service')
+        ? 'စကန် service မအား — ခဏ နေ ပြန် ကြိုး စား ပါ'
+        : 'စကန် မရ — internet စစ် ပြီး ပြန် ကြိုး စား ပါ';
     });
   }
   on('scanFile', 'change', onScanPicked);
