@@ -485,12 +485,34 @@
       if (bareRun.length) { out.push(bareRun.join(',')); bareRun = []; }
     }
     String(text || '').split(/\r?\n/).forEach(function (ln) {
-      var s = ln.replace(/[^0-9.\- ]/g, '').replace(/\s+/g, '');
-      var m = s.match(/^(\d{3})[-.](\d{3,})$/);
-      if (m) { flushBare(); out.push(m[1] + '=' + m[2]); return; }
-      if (/^\d{3}$/.test(s)) { bareRun.push(s); return; }
-      if (/^\d{3}[-.]$/.test(s)) { bareRun.push(s.slice(0, 3)); return; }
-      // anything else (totals, separators, junk) is not a bet line: drop
+      var t = ln.trim();
+      if (!/[0-9\u1040-\u1049]/.test(t)) return; // no digits: drop
+      // Strip a leading Latin name word (not a lone R/r marker).
+      var lead = t.match(/^[A-Za-z]+(?=\s)/);
+      if (lead && lead[0] !== 'R' && lead[0] !== 'r') t = t.slice(lead[0].length).trim();
+      // Strip a trailing lone R/r (noise; a real split has an amount after R).
+      t = t.replace(/\s+[Rr]$/, '');
+      // Keep only digits, Burmese, and the parser's own separators/markers.
+      var norm = t.replace(/[^0-9\u1000-\u109F=.,\/\-Rr@(){}~:* ]/g, '').replace(/\s+/g, ' ').trim();
+      if (!norm) return;
+      // 3 digits with trailing dot/dash: bare number, as before.
+      var tb = norm.match(/^([0-9\u1040-\u1049]{3})[-.]$/);
+      if (tb) { bareRun.push(tb[1]); return; }
+      // Digits (and spaces) only: one group -> bare (3) or total (drop);
+      // several groups -> a spaced single/list: emit, parser decides.
+      if (/^[0-9\u1040-\u1049\s]+$/.test(norm)) {
+        var parts = norm.split(' ');
+        if (parts.length === 1) {
+          if (parts[0].length === 3) { bareRun.push(parts[0]); return; }
+          return;
+        }
+      } else {
+        // Single number + dash + amount: dash was the old scan's '='.
+        var dm = norm.match(/^([0-9\u1040-\u1049]{3})\s*-\s*([0-9\u1040-\u1049]{3,})$/);
+        if (dm) { flushBare(); out.push(dm[1] + '=' + dm[2]); return; }
+      }
+      flushBare();
+      out.push(norm); // parser decides green/red on the board
     });
     flushBare();
     return out.length ? out.join('\n') + '\n' : '';
