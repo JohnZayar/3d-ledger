@@ -1,4 +1,7 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v29 (Pho, Nov 1): stray-character tolerance —
+ * '_' -> space, '.' removed only next to '=' ('137.=' ->
+ * '137='); list dots untouched; display stays verbatim.
  * Parser v28 (Pho, Nov 1): single-number spaced split —
  * '104=500 R 200' / '104 500r200' / '104 500 R 200' parse as
  * straight @A + 5 perms @B (6), never listperm 9; placed
@@ -124,6 +127,9 @@
     var raw = (line == null ? '' : String(line)).trim();
     if (!raw) return invalid(raw);
     var s = normalizeDigits(raw);
+    // Stray-character tolerance (Pho, Nov 1): see header v29.
+    s = s.replace(/_/g, ' ').replace(/\.=/g, '=').replace(/=\./g, '=');
+
     // Exclusion (Pho, Oct 25): a trailing {-...} group removes its
     // numbers from the expansion (applied after the body parses, so
     // it works for every line kind; stacked groups recurse).
