@@ -1,4 +1,4 @@
-/* 3D Master v60 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
+/* 3D Master v61 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -651,7 +651,11 @@
   }
   on('closeToggle', 'click', function () {
     var s = sess(); if (!s) return;
-    s.closed = !s.closed; Q('update', '3d_sessions', s.id, s); save(); renderCloseToggle(); render();
+    s.closed = !s.closed;
+    /* closedAt (Pho Oct 31): the close moment — server pushes created
+       before it still ledger; pushes after it never do. */
+    s.closedAt = s.closed ? Date.now() : null;
+    Q('update', '3d_sessions', s.id, s); save(); renderCloseToggle(); render();
   });
 
   $('exclSaveBtn').addEventListener('click', function () {
