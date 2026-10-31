@@ -1,4 +1,4 @@
-/* 3D Master v62 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
+/* 3D Master v63 — local-first + server sync (sync3d). Agent-terms settlement (Pho Oct 24): each agent auto-appears as a person row in Master's လူစာရင်း (role 'agent'); Master sets that agent's အဆ/ကော်/တွဒ်/ဟော့ဂဏန်း limit there; Master အချုပ် settles each agent's total at those terms (fallback: per-bettor math until terms set). Strict separation: Master ≠ Agent, Agent 1 ≠ Agent 9, each agent's list its own alone. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -868,6 +868,29 @@
   }
 
   /* ---------- vouchers ---------- */
+  /* ---------- voucher copy (Pho Oct 31): Copy on a NO row copies that NO batch ---------- */
+  var vcopyTexts = {};
+  function copyVoucherText(text, btn) {
+    var old = btn ? btn.textContent : '';
+    function done(ok) {
+      if (!btn) return;
+      btn.textContent = ok ? 'Copy ပြီး' : 'ကူးမရပါ';
+      setTimeout(function () { btn.textContent = old; }, 1500);
+    }
+    function fallback() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta); done(!!ok);
+      } catch (e) { done(false); }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { fallback(); });
+    } else fallback();
+  }
   $('voucherPerson').addEventListener('change', renderVoucher);
   function renderVoucher() {
     var s = sess();
@@ -917,12 +940,15 @@
     }
     var html = '';
     batches.forEach(function (b) {
-      var body = '', total = 0;
+      var body = '', total = 0, tlines = [];
       b.lines.forEach(function (lineRecs, li) {
         var lt = lineRecs.reduce(function (a, r) { return a + r.amount; }, 0);
         total += lt;
         var label = esc(lineRecs[0].formula);
         if (lineRecs[0].isFormula || lineRecs.length > 1) label += ' (' + lineRecs.length + ')';
+        var tlabel = lineRecs[0].formula;
+        if (lineRecs[0].isFormula || lineRecs.length > 1) tlabel += ' (' + lineRecs.length + ')';
+        tlines.push(tlabel + ' ' + fmt(lt));
         var xid = 'x' + b.no + '-' + li;
         var rowCls = 'vline';
         if (s.winning && lineRecs.some(function (r) { return r.number === s.winning; })) rowCls += ' vwin';
@@ -936,10 +962,17 @@
         body += '<tr id="' + xid + '" style="display:none"><td class="xpand" colspan="2"><div class="xgrid">' + chips + '</div></td></tr>';
       });
       body += '<tr class="vtot"><td colspan="2">Total ' + fmt(total) + '</td></tr>';
-      html += '<div class="vbatch"><div class="vhead">NO ' + b.no + (b.ok ? ' <span class="pos">ok</span>' : '') + '</div>' +
+      vcopyTexts[b.no] = ($('voucherPerson').selectedOptions[0] ? $('voucherPerson').selectedOptions[0].textContent : '') + '\n' + (s.date || '') + '\nNO ' + b.no + '\n' + tlines.join('\n') + '\nTotal ' + fmt(total);
+      html += '<div class="vbatch"><div class="vhead">NO ' + b.no + (b.ok ? ' <span class="pos">ok</span>' : '') + '<button class="vcopy" data-no="' + b.no + '" style="float:right;background:#3a3b41;color:#ffd970;border:1px solid #55565e;border-radius:6px;padding:2px 10px;font-size:12px;font-weight:700">Copy</button></div>' +
         '<table class="vt">' + body + '</table></div>';
     });
     box.innerHTML = html;
+    box.querySelectorAll('.vcopy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var t = vcopyTexts[btn.getAttribute('data-no')];
+        if (t) copyVoucherText(t, btn);
+      });
+    });
     box.querySelectorAll('.vline').forEach(function (tr) {
       tr.addEventListener('click', function () {
         if (suppressClick) { suppressClick = false; return; }
