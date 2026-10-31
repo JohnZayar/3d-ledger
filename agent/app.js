@@ -1,4 +1,4 @@
-/* 3D Agent v19 — local-first + server sync (sync3d).
+/* 3D Agent v23 — local-first + server sync (sync3d).
    Scope (Pho, Oct 24): ထိုးကွက် + လူစာရင်း + ဘောက်ချာ + အချုပ်.
    Separateness (Pho Oct 24, သတ်သတ်စီ): this app shows ONLY its
    own bettors — never Master people, never other agents' bettors,
@@ -701,7 +701,7 @@
     var recs = lineRecsOf(menuLineId);
     if (!recs.length) return closeLineMenu();
     if (!confirm('ဒီ လိုင်း ဖျက် မလား? ' + recs[0].formula)) return;
-    recs.forEach(function (r) { Q('delete', '3d_records', r.id, null); });
+    recs.forEach(function (r) { Q('delete', '3d_records', r.id, r); });
     state.records = state.records.filter(function (r) { return r.lineId !== menuLineId; });
     save(); render(); closeLineMenu();
   });
@@ -743,7 +743,7 @@
         amount: it.amount, formula: r.formula, isFormula: r.kind !== 'single', agentId: state.agentCode || null
       };
     });
-    recs.forEach(function (r0) { Q('delete', '3d_records', r0.id, null); });
+    recs.forEach(function (r0) { Q('delete', '3d_records', r0.id, r0); });
     newRecs.forEach(function (rec) { Q('create', '3d_records', rec.id, rec); });
     newRecs.forEach(function (rec, i) { state.records.splice(idx + i, 0, rec); });
     save(); render(); closeLineMenu();
@@ -767,7 +767,7 @@
     var p = person(menuPersonId); if (!p) return closePersonMenu();
     var n = state.records.filter(function (r) { return r.personId === p.id; }).length;
     if (!confirm('ဒီ လူ ဖျက် မလား? ' + p.name + (n ? ' — စာရင်း ' + n + ' ကွက် ပါ ပျက် မယ်' : ''))) return;
-    state.records.filter(function (r) { return r.personId === p.id; }).forEach(function (r) { Q('delete', '3d_records', r.id, null); });
+    state.records.filter(function (r) { return r.personId === p.id; }).forEach(function (r) { Q('delete', '3d_records', r.id, r); });
     Q('delete', '3d_people', p.id, null);
     state.people = state.people.filter(function (x) { return x.id !== p.id; });
     state.records = state.records.filter(function (r) { return r.personId !== p.id; });
@@ -864,6 +864,45 @@
     location.reload();
   });
 
+
+  /* ---------- closed-session blocked list (Pho Oct 31) ----------
+     Unsent bets for a closed session live here — never auto-deleted.
+     The agent sees exactly what didn't go through, with per-batch
+     detail, until he taps the delete button himself. */
+  function renderBlocked() {
+    var box = $('blockedBox'); if (!box) return;
+    var groups = (window.Sync3D && window.Sync3D.getBlocked) ? window.Sync3D.getBlocked() : [];
+    if (!groups.length) { box.innerHTML = ''; return; }
+    var html = '<div class="empty" style="border-color:#c0392b;color:#ececec"><b>ပိတ်ပြီမို့ စာရင်းများမရတော့ပါ။</b></div>';
+    groups.forEach(function (g) {
+      var p = person(g.personId);
+      var s = (state.sessions || []).find(function (x) { return x.id === g.sessionId; });
+      var total = g.lines.reduce(function (a, l) { return a + (l.amount || 0); }, 0);
+      html += '<div class="empty" style="text-align:left;margin-top:10px">';
+      html += '<b>' + esc(p ? p.name : '—') + '</b> · ' + esc(s ? s.date : '') + ' · NO ' + g.batchNo + ' · ' + (g.op === 'delete' ? 'ဖျက်မှု မရပါ' : 'ထိုးကွက် မပို့ပါ');
+      g.lines.forEach(function (l) {
+        var label = (l.isFormula && l.formula) ? l.formula : (l.number == null ? '—' : l.number);
+        html += '<div>' + esc(label) + ' — ' + fmt(l.amount || 0) + '</div>';
+      });
+      html += '<div><b>စုစုပေါင်း ' + fmt(total) + '</b></div>';
+      html += '<button class="danger" data-blockdel="' + esc(g.key) + '">❌ဖျက်</button></div>';
+    });
+    box.innerHTML = html;
+    box.querySelectorAll('[data-blockdel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var key = b.getAttribute('data-blockdel');
+        var g = groups.find(function (x) { return x.key === key; });
+        if (!g) return;
+        var msg = g.op === 'delete'
+          ? 'ဒီသတိပေးချက်ကို ဖျက်မှာလား? စာရင်းက Master မှာ ကျန်နေမယ်။'
+          : 'ဒီစာရင်းကို ဖျက်မှာလား? Master ကို ဘယ်တော့မှ မရောက်တော့ဘူး။';
+        if (!confirm(msg)) return;
+        if (window.Sync3D && window.Sync3D.removeBlocked) window.Sync3D.removeBlocked(key);
+        save(); render();
+      });
+    });
+  }
+
   /* ---------- render all ---------- */
   function render() {
     renderSessions();
@@ -871,6 +910,7 @@
     renderPeople();
     renderDaily();
     renderVoucher();
+    renderBlocked();
     parseBoard();
     renderSyncStatus();
   }
