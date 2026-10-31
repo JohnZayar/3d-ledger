@@ -556,7 +556,20 @@
       if (bareRun.length) { out.push(bareRun.join(',')); bareRun = []; }
     }
     String(text || '').split(/\r?\n/).forEach(function (ln) {
-      var s = ln.replace(/[^0-9.\- ]/g, '').replace(/\s+/g, '');
+      var t = ln.trim();
+      // Equals single (Pho, Nov 1): matched on the RAW line before any
+      // stripping, so '=' can never merge into a wrong amount.
+      var em = t.match(/^(\d{3})\s*=\s*(\d{3,})$/);
+      if (em) { flushBare(); out.push(em[1] + '=' + em[2]); return; }
+      // Any other '=' line (R-split, chained lists) is dropped, never
+      // strip-merged: '104=500 R 200' must not become '104=500200'.
+      if (t.indexOf('=') !== -1) return;
+      // Standalone R/r followed by a number (split line) is dropped:
+      // stripping the R would merge '104. 500 R 200' into the WRONG
+      // single '104=500200'. A trailing R with no number after it
+      // falls through to the strip path, as before.
+      if (/(^|\s)[Rr]\s+\d/.test(t)) return;
+      var s = t.replace(/[^0-9.\- ]/g, '').replace(/\s+/g, '');
       var m = s.match(/^(\d{3})[-.](\d{3,})$/);
       if (m) { flushBare(); out.push(m[1] + '=' + m[2]); return; }
       if (/^\d{3}$/.test(s)) { bareRun.push(s); return; }
