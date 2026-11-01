@@ -420,14 +420,41 @@
 
   /* ---------- entry board ---------- */
   var lastParse = [];
+  // Board inheritance (Pho, Nov 1): a bare 3-digit line takes the
+  // amount + form of the nearest amount-bearing line above it since
+  // the last blank line ('ငွေတူလို့ထပ်မရေးတော့တာ' — 100 after
+  // 500.1000 is straight@1000; 864 after 371r500 is perms@500). A
+  // blank line clears the state ('လိုင်းခြားရင်ဖြတ် အုပ်စုမတူ').
+  // Only exactly 3 digits inherit; anything else stays red. The
+  // preview/voucher keep the TYPED line; only numbers/amounts come
+  // from the synthesized parse.
+  function inheritState(r) {
+    if (!r || !r.ok || !r.items || !r.items.length) return null;
+    return { amount: r.items[0].amount, perm: (r.kind === 'perm' || r.kind === 'listperm') };
+  }
+  function effectiveParse(ln, inh) {
+    var r = parseLine(ln);
+    if (r.ok) return { r: r, inh: inheritState(r), inherited: false, synth: null };
+    if (!inh) return { r: r, inh: null, inherited: false, synth: null };
+    var num = String(ln).trim().split('').map(function (c) { var code = c.charCodeAt(0); return (code >= 0x1040 && code <= 0x1049) ? String(code - 0x1040) : c; }).join('');
+    if (!/^\d{3}$/.test(num)) return { r: r, inh: inh, inherited: false, synth: null };
+    var synth = num + (inh.perm ? 'r' : '=') + inh.amount;
+    var syn = parseLine(synth);
+    if (!syn.ok) return { r: r, inh: inh, inherited: false, synth: null };
+    syn.formula = String(ln).trim();
+    return { r: syn, inh: inh, inherited: true, synth: synth };
+  }
   function parseBoard() {
     var lines = $('board').value.split('\n');
     lastParse = [];
     var lineIdx = [];
+    var inh = null;
     lines.forEach(function (ln, li) {
-      if (!ln.trim()) return;
+      if (!ln.trim()) { inh = null; return; }
       lineIdx.push(li);
-      lastParse.push(parseLine(ln));
+      var e = effectiveParse(ln, inh);
+      inh = e.inh;
+      lastParse.push(e.r);
     });
     var valid = lastParse.filter(function (r) { return r.ok; });
     var bad = lastParse.filter(function (r) { return !r.ok; });
@@ -708,13 +735,20 @@
     if (!exclPending) return;
     var nums = exclPending.all || [exclPending.n];
     hideExcl();
+    var inh = null;
     var out = $('board').value.split('\n').map(function (ln) {
-      var r = parseLine(ln);
+      if (!ln.trim()) { inh = null; return ln; }
+      var e = effectiveParse(ln, inh);
+      inh = e.inh;
+      var r = e.r;
       if (!r.ok) return ln;
       var hit = r.items.filter(function (it) { return nums.indexOf(it.number) >= 0; }).map(function (it) { return it.number; });
       var uniq = hit.filter(function (x, i) { return hit.indexOf(x) === i; });
       if (!uniq.length) return ln;
-      return ln + '{-' + uniq.join('/') + '}';
+      // An inherited line cannot carry {-...} on its typed text (the
+      // bare number alone does not parse), so the exclusion rides on
+      // the synthesized line, which parses and saves correctly.
+      return (e.inherited ? e.synth : ln) + '{-' + uniq.join('/') + '}';
     });
     $('board').value = out.join('\n');
     parseBoard();
