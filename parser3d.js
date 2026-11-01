@@ -1,4 +1,9 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v30 (Pho, Nov 1): range-as-series + bare-dae —
+ * '220မှ229ထိ=100' IS 22နောက်စီးရီး, '022မှ922ထိ=100' IS
+ * 22ထိပ်စီးရီး (10 each; ends must differ in one digit
+ * 0<->9, else red); bare-dae = straight ('257ဒဲ့1500',
+ * list + dae + amount); dae+ar split untouched.
  * Parser v29 (Pho, Nov 1): stray-character tolerance —
  * '_' -> space, '.' removed only next to '=' ('137.=' ->
  * '137='); list dots untouched; display stays verbatim.
@@ -163,6 +168,45 @@
         if (pn !== straight) dItems.push({ number: pn, amount: rAmt });
       });
       return finishItems(dItems, raw, 'daekyan');
+    }
+
+    // Range-as-series (Pho, Nov 1): '220မှ229ထိ=100' IS the series
+    // form, only written differently — 220-229 = 22နောက်စီးရီး,
+    // 022-922 = 22ထိပ်စီးရီး. The two ends must differ in exactly one
+    // digit and that digit must run 0<->9; anything else (e.g.
+    // 220မှ225ထိ) stays red rather than guessing a partial range.
+    m = s.match(/^(\d)(\d)(\d)\s*မှ\s*(\d)(\d)(\d)\s*ထိ\s*=?\s*(\d+)$/);
+    if (m) {
+      var rA = [m[1], m[2], m[3]], rB = [m[4], m[5], m[6]], rDiff = -1, rOk = true;
+      for (var ri = 0; ri < 3; ri++) {
+        if (rA[ri] !== rB[ri]) {
+          if (rDiff !== -1) { rOk = false; break; }
+          rDiff = ri;
+        }
+      }
+      if (rOk && rDiff !== -1) {
+        var d0 = rA[rDiff], d1 = rB[rDiff];
+        if (!((d0 === '0' && d1 === '9') || (d0 === '9' && d1 === '0'))) rOk = false;
+      }
+      if (!rOk || rDiff === -1) return invalid(raw);
+      var rAmt = parseInt(m[7], 10);
+      if (!(rAmt > 0)) return invalid(raw);
+      var rNums = [];
+      for (var rk = 0; rk < 10; rk++) {
+        var trip = rA.slice(); trip[rDiff] = String(rk); rNums.push(trip.join(''));
+      }
+      return finish(rNums, rAmt, raw, 'list');
+    }
+
+    // Bare dae = straight (Pho, Nov 1): '257ဒဲ့1500' and a dot-list
+    // with dae at the end ('...249.ဒဲ့200') read as straight at the
+    // amount. The dae+ar split above runs first, so it is untouched.
+    m = s.match(/^(\d{3}(?:[\s.,~\-:*/]+\d{3})*)[\s.,~\-:*/]*ဒဲ့\s*(\d+)$/);
+    if (m) {
+      var daNums = m[1].split(/[\s.,~\-:*/]+/);
+      var daAmt = parseInt(m[2], 10);
+      if (!(daAmt > 0)) return invalid(raw);
+      return finish(daNums, daAmt, raw, daNums.length === 1 ? 'single' : 'list');
     }
 
     // Bettor typed formats (Pho Oct 22, from forwarded Viber messages):
