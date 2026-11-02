@@ -1,4 +1,4 @@
-/* Sync3D v2 (Pho Oct 31) — shared by 3D Master + 3D Agent.
+/* Sync3D v3 (Pho Nov 2) — shared by 3D Master + 3D Agent.
    Plain script, no modules (the 3D apps are plain-script apps).
    Mirrors the Pho-approved 2D sync-simple design, adapted for 3D:
    - Server-ID-only FIFO queue, local id IS the PocketBase record id.
@@ -92,13 +92,31 @@
     var a = useAuth ? _auth() : null;
     var opt = { method: method, headers: _headers(a ? a.token : null) };
     if (body !== undefined) opt.body = JSON.stringify(body);
+    /* Sync-fix Nov 2: 60s fetch timeout. A hung request on a slow
+       link used to hold _syncing=true indefinitely, silently
+       skipping every later sync (the Sync button looked dead).
+       On timeout the request aborts and fails as NETWORK_ERROR, so
+       the op stays queued and the push/pull finally-handlers reset
+       _syncing (every _syncing=true in this file has a reset on
+       both resolve and reject paths). */
+    var ctrl = null, timer = null;
+    try {
+      if (typeof AbortController !== 'undefined') {
+        ctrl = new AbortController();
+        opt.signal = ctrl.signal;
+        timer = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 60000);
+      }
+    } catch (e) { ctrl = null; }
+    function clearTimer() { if (timer) { try { clearTimeout(timer); } catch (e) {} timer = null; } }
     return fetch(PB + path, opt).then(function (res) {
+      clearTimer();
       if (res.ok) return res.status === 204 ? null : res.json().catch(function () { return null; });
       return res.json().catch(function () { return {}; }).then(function (d) {
         var e = new Error((d && d.message) || ('HTTP ' + res.status));
         e.code = res.status; e.pb = d; throw e;
       });
     }).catch(function (err) {
+      clearTimer();
       if (err && err.code) throw err;
       var e = new Error('network');
       e.code = 'NETWORK_ERROR'; throw e;
@@ -460,16 +478,19 @@
       _queue().sort(function (a, b) { return (a.created || 0) - (b.created || 0); }).forEach(function (entry) {
         chain = chain.then(function () {
           if (adopted[entry.id]) return;
-          /* Agent hold (Oct 24 phantom-session lesson): NEVER push
-             records before the Agent has SEEN a server session. Until
-             the first pull adopts the Master's round, local records
-             carry the seed session id — pushing them orphans them on
-             the server (Master shows 0). Held ops stay queued;
-             adoption re-keys them, and the next push sends them
-             under the server session id. */
+          /* Per-session hold (Nov 2 sync fix): push a record create
+             ONLY when its own session has been seen on the server.
+             The old any-session hold let a fresh phone's seed-round
+             records orphan under a local id when Master hadn't
+             created the round yet (Master skips session-unknown
+             records). Held ops stay queued (visible via the queue
+             count); adoption re-keys them, and the next push sends
+             them under the server session id. People creates are
+             NOT held (unchanged). */
           if (_cfg.role === 'agent' && entry.op === 'create' && entry.collection === '3d_records') {
             var seenNow = (_meta().seen || {})['3d_sessions'] || [];
-            if (!seenNow.length) return;
+            var sid = (entry.data && entry.data.sessionId) || '';
+            if (seenNow.indexOf(sid) < 0) return;
           }
           /* CLOSE GATE (Pho Oct 31): an Agent op for a closed session
              never leaves the phone — it moves to the blocked list
@@ -676,6 +697,7 @@
     removeBlocked: removeBlocked,
     pushPending: pushPending,
     pullUpdates: pullUpdates,
+    refreshSessions: refreshSessions,
     syncNow: syncNow,
     startAutoSync: startAutoSync,
     getLastPushError: function () { return _lastPushError; },
