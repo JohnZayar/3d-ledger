@@ -58,7 +58,7 @@
 
   /* ---------- sync wiring (Pho Oct 24; Agent pushes people+records only) ---------- */
   function Q(op, coll, id, obj) { try { if (window.Sync3D) window.Sync3D.queue(op, coll, id, obj); } catch (e) {} }
-  function syncAfter() { save(); render(); refreshAcks(); }
+  function syncAfter() { save(); render(); refreshAcks(true); }
 
   /* ---------- acks (Pho Oct 24, 2D-style) ----------
      Master auto-acks a save once it enters Master's ledger; the
@@ -67,10 +67,10 @@
      agent's acks can never badge this agent's batches. */
   function ackKey(sid, aid, pid, bn) { return sid + '|' + aid + '|' + pid + '|' + bn; }
   var lastAckFetch = 0;
-  function refreshAcks() {
+  function refreshAcks(force) {
     if (!window.Sync3D || !window.Sync3D.isLoggedIn()) return;
     var now = Date.now();
-    if (now - lastAckFetch < 60000) return; // Pho Oct 25: OK badge lag — was 5 min, now matches the 60s sync cadence.
+    if (!force && now - lastAckFetch < 60000) return; // Pho Oct 25: OK badge lag — was 5 min, now matches the 60s sync cadence.
     lastAckFetch = now;
     var tok = null;
     try { var a = JSON.parse(localStorage.getItem('3dAgentAuth') || 'null'); tok = a && a.token; } catch (e) {}
@@ -104,8 +104,15 @@
   }
   function syncNowUI() {
     if (!window.Sync3D || !window.Sync3D.isLoggedIn()) { renderSyncStatus(); return; }
+    /* Sync-fix Nov 2: if a sync is already running, say so visibly
+       instead of silently skipping (the silent skip made the Sync
+       button look dead). */
+    if (window.Sync3D.isSyncing()) { renderSyncStatus('Sync လုပ်နေတယ် — ခဏစောင့်'); return; }
     renderSyncStatus('Sync နေ တယ်…');
-    window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function () { renderSyncStatus(); render(); });
+    window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function (r) {
+      if (r && r.push && r.push.skipped && r.pull && r.pull.skipped) { renderSyncStatus('Sync လုပ်နေတယ် — ခဏစောင့်'); return; }
+      renderSyncStatus(); render();
+    });
   }
 
   /* ---------- helpers ---------- */
@@ -763,6 +770,15 @@
     $('board').value = leftover;
     parseBoard();
     save(); render();
+    /* Sync-fix Nov 2: push-on-save — try to push immediately after
+       Save instead of waiting for the 60s timer. Fire-and-forget:
+       never blocks the Save render; failures stay queued; if a sync
+       is already running the _syncing guard skips it. */
+    try {
+      if (window.Sync3D && window.Sync3D.isLoggedIn()) {
+        window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function () { renderSyncStatus(); render(); }).catch(function () {});
+      }
+    } catch (e) {}
     $('entryStatus').textContent = 'NO ' + batchNo + ' သိမ်းပြီး' +
       (leftover ? ' — နီ တဲ့ လိုင်း ကျန် နေ တယ်' : '');
   });
