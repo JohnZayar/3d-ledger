@@ -1,4 +1,4 @@
-/* Sync3D v3 (Pho Nov 2) — shared by 3D Master + 3D Agent.
+/* Sync3D v4 (Pho Nov 2) — shared by 3D Master + 3D Agent.
    Plain script, no modules (the 3D apps are plain-script apps).
    Mirrors the Pho-approved 2D sync-simple design, adapted for 3D:
    - Server-ID-only FIFO queue, local id IS the PocketBase record id.
@@ -523,6 +523,25 @@
     });
   }
 
+  /* Incremental pull (Pho Nov 2): format a server-side datetime
+     filter value (UTC, PocketBase "YYYY-MM-DD HH:MM:SS" form). */
+  function _fmtPbDate(ms) {
+    var d = new Date(ms);
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+  }
+  function _parsePbDate(s) {
+    var t = Date.parse(String(s || '').replace(' ', 'T'));
+    return isNaN(t) ? 0 : t;
+  }
+  /* One collection fetch: full when wm is 0, else only rows updated
+     since (wm minus a 5-minute overlap for clock safety). */
+  function _pullOne(coll, tenant, wm) {
+    var filter = 'tenant="' + tenant + '"';
+    if (wm) filter += ' && updated >= "' + _fmtPbDate(wm - 300000) + '"';
+    return _listAll(coll, { filter: filter, sort: 'created' });
+  }
+
   function pullUpdates(state, saveFn) {
     if (_syncing) return Promise.resolve({ pulled: 0, skipped: true });
     if (!isLoggedIn()) return Promise.resolve({ pulled: 0, skipped: true, reason: 'not-logged-in' });
@@ -531,6 +550,7 @@
     var tenant = getTenant();
     var colls = _cfg.role === 'agent' ? ['3d_sessions', '3d_people'] : ['3d_sessions', '3d_people', '3d_records'];
     var meta = _meta();
+    var wm = meta.pullWatermark || {};
     /* Orphan rule (fixed Oct 24): a pull deletes ONLY rows it has
        SEEN on the server before (meta.seen) but that are gone now.
        A local row never seen on the server is NEVER deleted by pull
@@ -544,7 +564,27 @@
 
     colls.forEach(function (coll) {
       chain = chain.then(function () {
-        return _listAll(coll, { filter: 'tenant="' + tenant + '"', sort: 'created' }).then(function (items) {
+        var full = !wm[coll];
+        function fetchColl() {
+          return _pullOne(coll, tenant, full ? 0 : wm[coll]).then(function (items) {
+            return { items: items, full: full };
+          }).catch(function (err) {
+            if (!full && err && err.code === 400) {
+              full = true;
+              return _pullOne(coll, tenant, 0).then(function (items) {
+                return { items: items, full: true };
+              });
+            }
+            throw err;
+          });
+        }
+        return fetchColl().then(function (res) {
+          var items = res.items, isFull = res.full;
+          var maxUp = wm[coll] || 0;
+          items.forEach(function (it) {
+            var t = _parsePbDate(it.updated);
+            if (t > maxUp) maxUp = t;
+          });
           var serverIds = {};
           items.forEach(function (it) { serverIds[it.id] = 1; });
           if (coll === '3d_sessions') {
@@ -589,6 +629,7 @@
           // Orphan deletion: only rows seen on the server in an
           // EARLIER pull but absent now — and never rows with a
           // pending queue op (queue re-read NOW, at deletion time).
+          if (isFull) {
           var oldSeen = {};
           (seen[coll] || []).forEach(function (id) { oldSeen[id] = 1; });
           var pending = {};
@@ -604,7 +645,15 @@
             }
             return false;
           });
-          seen[coll] = Object.keys(serverIds);
+            seen[coll] = Object.keys(serverIds);
+          } else {
+            /* Incremental: union into seen, never delete. */
+            var cur = {};
+            (seen[coll] || []).forEach(function (id) { cur[id] = 1; });
+            Object.keys(serverIds).forEach(function (id) { cur[id] = 1; });
+            seen[coll] = Object.keys(cur);
+          }
+          if (maxUp > (wm[coll] || 0)) wm[coll] = maxUp;
         }).catch(function (err) { errors.push(coll + ': ' + err.message); });
       });
     });
@@ -615,6 +664,7 @@
         if (!cur) state.currentSessionId = state.sessions[0].id;
       }
       meta.seen = seen;
+      meta.pullWatermark = wm;
       meta.skippedRecords = Object.keys(skipped);
       _setMeta(meta);
       _syncing = false;
