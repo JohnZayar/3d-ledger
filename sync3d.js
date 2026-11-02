@@ -1,4 +1,4 @@
-/* Sync3D v4 (Pho Nov 2) — shared by 3D Master + 3D Agent.
+/* Sync3D v5 (Pho Nov 2) — shared by 3D Master + 3D Agent.
    Plain script, no modules (the 3D apps are plain-script apps).
    Mirrors the Pho-approved 2D sync-simple design, adapted for 3D:
    - Server-ID-only FIFO queue, local id IS the PocketBase record id.
@@ -152,6 +152,15 @@
       var items = (res && res.items) || [];
       return items.length ? !!items[0].disabled : false;
     }).catch(function () { return false; });
+  }
+  /* Trial (Pho Nov 2): returns the agent row's close state, or null
+     when the row cannot be fetched (fail-open; Master backstop enforces). */
+  function getAgentTrial(code) {
+    return _list('3d_agents', { filter: 'code="' + code + '"', perPage: 5 }).then(function (res) {
+      var items = (res && res.items) || [];
+      if (!items.length) return null;
+      return { disabled: !!items[0].disabled, trialUntil: items[0].trialUntil || null };
+    }).catch(function () { return null; });
   }
 
   function login(email, password) {
@@ -691,14 +700,27 @@
   }
   function syncNow(state, saveFn, agentCode) {
     if (_syncing) return Promise.resolve({ push: { skipped: true }, pull: { skipped: true } });
-    return refreshSessions(state).then(function () {
-      return pushPending(state, saveFn, agentCode);
-    }).then(function (pushRes) {
-      return pullUpdates(state, saveFn).then(function (pullRes) {
-        return { push: pushRes, pull: pullRes };
+    /* Trial guard (Pho Nov 2): agent-only, set via init({trialGuard}).
+       A blocked trial syncs NOTHING (no refresh, no push, no pull);
+       the caller shows the message from trialBlocked. Master never
+       sets a guard, so Master sync is unchanged. */
+    var guard = _cfg.trialGuard;
+    var guardP = (typeof guard === 'function')
+      ? Promise.resolve().then(guard).catch(function () { return { ok: true }; })
+      : Promise.resolve({ ok: true });
+    return guardP.then(function (g) {
+      if (g && g.ok === false) {
+        return { push: { skipped: true }, pull: { skipped: true }, trialBlocked: g.reason || 'expired' };
+      }
+      return refreshSessions(state).then(function () {
+        return pushPending(state, saveFn, agentCode);
+      }).then(function (pushRes) {
+        return pullUpdates(state, saveFn).then(function (pullRes) {
+          return { push: pushRes, pull: pullRes };
+        });
+      }).catch(function (err) {
+        return { push: { failed: 1 }, pull: { skipped: true }, error: String(err && err.message || err) };
       });
-    }).catch(function (err) {
-      return { push: { failed: 1 }, pull: { skipped: true }, error: String(err && err.message || err) };
     });
   }
 
@@ -735,6 +757,7 @@
     codeToCreds: codeToCreds,
     login: login,
     checkAgentDisabled: checkAgentDisabled,
+    getAgentTrial: getAgentTrial,
     logout: logout,
     isLoggedIn: isLoggedIn,
     getTenant: getTenant,
