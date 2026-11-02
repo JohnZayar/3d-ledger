@@ -60,6 +60,69 @@
   function Q(op, coll, id, obj) { try { if (window.Sync3D) window.Sync3D.queue(op, coll, id, obj); } catch (e) {} }
   function syncAfter() { save(); render(); refreshAcks(true); }
 
+  /* ---------- trial (Pho Nov 2): 7-day trial + in-app reminder + auto-close ----------
+     Trial = 3d_agents row carries trialUntil (epoch ms). Paid/normal
+     rows have no trialUntil. Reminder banner on home while 2 or fewer
+     days remain (day 6 + day 7); expiry blocks login AND every sync
+     (trialGuard), and Master auto-disables the row as backstop. */
+  function trialDaysLeft() {
+    var tu = state.trialUntil;
+    if (!tu) return null;
+    return Math.ceil((tu - Date.now()) / 86400000);
+  }
+  function renderTrialBanner() {
+    var el = $('trialBanner'); if (!el) return;
+    var dl = trialDaysLeft();
+    if (dl == null || dl > 2) { el.style.display = 'none'; el.textContent = ''; return; }
+    el.style.display = '';
+    el.textContent = dl > 0 ? ('စမ်း ' + dl + ' ရက် ကျန်တယ် — ဝယ်ဖို့ ဆက်သွယ်ပါ') : 'အစမ်းရက်ပြည့်ပြီ';
+  }
+  function handleTrialBlocked(r) {
+    if (!r || !r.trialBlocked) return false;
+    var msg = r.trialBlocked === 'disabled' ? 'ဒီ code ပိတ်ထားသည်' : 'အစမ်းရက်ပြည့်ပြီ';
+    try { window.Sync3D.logout(); } catch (e) {}
+    var ls = $('loginStatus'); if (ls) ls.textContent = msg;
+    renderSyncStatus(msg);
+    go('login');
+    return true;
+  }
+  function trialGuard() {
+    var code = state.agentCode;
+    if (!code || !window.Sync3D) return Promise.resolve({ ok: true });
+    return window.Sync3D.getAgentTrial(code).then(function (t) {
+      if (!t) return { ok: true };
+      if (t.disabled) return { ok: false, reason: 'disabled' };
+      if (t.trialUntil && Date.now() > t.trialUntil) return { ok: false, reason: 'expired' };
+      if (t.trialUntil) { state.trialUntil = t.trialUntil; save(); }
+      return { ok: true };
+    }).catch(function () { return { ok: true }; });
+  }
+  function setupTrial(code) {
+    if (!window.Sync3D || !window.Sync3D.getAgentTrial) return Promise.resolve(true);
+    return window.Sync3D.getAgentTrial(code).then(function (t) {
+      if (t && t.disabled) {
+        window.Sync3D.logout();
+        $('loginStatus').textContent = 'ဒီ code ပိတ်ထားသည်';
+        go('login');
+        return false;
+      }
+      if (t && t.trialUntil && Date.now() > t.trialUntil) {
+        window.Sync3D.logout();
+        $('loginStatus').textContent = 'အစမ်းရက်ပြည့်ပြီ';
+        go('login');
+        return false;
+      }
+      if (t && t.trialUntil) { state.trialUntil = t.trialUntil; }
+      else { state.trialUntil = null; }
+      save();
+      window.Sync3D.init({ trialGuard: trialGuard });
+      return true;
+    }).catch(function () {
+      window.Sync3D.init({ trialGuard: trialGuard });
+      return true;
+    });
+  }
+
   /* ---------- acks (Pho Oct 24, 2D-style) ----------
      Master auto-acks a save once it enters Master's ledger; the
      ack rows live in 3d_acks and are fetched directly here (not
@@ -110,6 +173,7 @@
     if (window.Sync3D.isSyncing()) { renderSyncStatus('Sync လုပ်နေတယ် — ခဏစောင့်'); return; }
     renderSyncStatus('Sync နေ တယ်…');
     window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function (r) {
+      if (handleTrialBlocked(r)) return;
       if (r && r.push && r.push.skipped && r.pull && r.pull.skipped) { renderSyncStatus('Sync လုပ်နေတယ် — ခဏစောင့်'); return; }
       renderSyncStatus(); render();
     });
@@ -169,17 +233,13 @@
     if (!creds) { state.agentCode = code; save(); go('home'); return; } // test code: local-only (v1)
     $('loginStatus').textContent = 'Login နေ တယ်…';
     window.Sync3D.login(creds.email, creds.password).then(function () {
-      return window.Sync3D.checkAgentDisabled(code);
-    }).then(function (disabled) {
-      if (disabled) {
-        window.Sync3D.logout();
-        $('loginStatus').textContent = 'ဒီ code ပိတ်ထားသည်';
-        return;
-      }
+      return setupTrial(code);
+    }).then(function (ok) {
+      if (!ok) return;
       state.agentCode = code; save(); go('home');
       window.Sync3D.repushOnce(state, 'agent'); /* push pre-sync local data once */
-      window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function () { renderSyncStatus(); render(); });
-      window.Sync3D.startAutoSync(state, syncAfter, state.agentCode, function () { renderSyncStatus(); render(); });
+      window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function (r) { handleTrialBlocked(r); renderSyncStatus(); render(); });
+      window.Sync3D.startAutoSync(state, syncAfter, state.agentCode, function (r) { handleTrialBlocked(r); renderSyncStatus(); render(); });
     }).catch(function () {
       // offline / wrong code: stay local-only, retry at next open
       state.agentCode = code; save(); go('home');
@@ -222,6 +282,7 @@
     var t = sessRecords().reduce(function (a, r) { return a + r.amount; }, 0);
     $('homeTotal').textContent = fmt(t);
     var cs = $('agentCodeShow'); if (cs) cs.textContent = state.agentCode || '—';
+    renderTrialBanner();
   }
 
   /* ---------- people ---------- */
@@ -776,7 +837,7 @@
        is already running the _syncing guard skips it. */
     try {
       if (window.Sync3D && window.Sync3D.isLoggedIn()) {
-        window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function () { renderSyncStatus(); render(); }).catch(function () {});
+        window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function (r) { handleTrialBlocked(r); renderSyncStatus(); render(); }).catch(function () {});
       }
     } catch (e) {}
     $('entryStatus').textContent = 'NO ' + batchNo + ' သိမ်းပြီး' +
@@ -1131,9 +1192,12 @@
       var creds0 = window.Sync3D.codeToCreds(state.agentCode);
       if (creds0) {
         window.Sync3D.login(creds0.email, creds0.password).then(function () {
+          return setupTrial(state.agentCode);
+        }).then(function (ok) {
+          if (!ok) return;
           window.Sync3D.repushOnce(state, 'agent'); /* push pre-sync local data once */
-          window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function () { renderSyncStatus(); render(); });
-          window.Sync3D.startAutoSync(state, syncAfter, state.agentCode, function () { renderSyncStatus(); render(); });
+          window.Sync3D.syncNow(state, syncAfter, state.agentCode).then(function (r) { handleTrialBlocked(r); renderSyncStatus(); render(); });
+          window.Sync3D.startAutoSync(state, syncAfter, state.agentCode, function (r) { handleTrialBlocked(r); renderSyncStatus(); render(); });
         }).catch(function () { renderSyncStatus(); });
       }
     }
