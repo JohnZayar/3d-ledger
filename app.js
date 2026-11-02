@@ -203,6 +203,16 @@
         var map = {};
         agentRecords = [];
         (d.items || []).forEach(function (it) { if (it.code) { map[it.code] = it.name || ''; agentRecords.push(it); } });
+        /* Trial auto-close (Pho Nov 2): Master disables expired trial
+           rows whenever it lists agents, so a closed trial stays closed
+           even if the agent never re-opens the app. Paid rows (no
+           trialUntil) are never touched; already-disabled rows are
+           never re-patched. */
+        (d.items || []).forEach(function (it) {
+          if (it.trialUntil && !it.disabled && it.trialUntil < Date.now()) {
+            pbReq('PATCH', '/collections/3d_agents/records/' + encodeURIComponent(it.id), { disabled: true }).catch(function () {});
+          }
+        });
         var changed = JSON.stringify(map) !== JSON.stringify(state.agentNames || {});
         state.agentNames = map;
         var created = ensureAgentPeople();
@@ -1605,6 +1615,18 @@
     }).then(function () { renderMyAgentList(); })
     .catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
   }
+  /* Trial (Pho Nov 2): set a 7-day trial, or convert to paid by
+     clearing trialUntil. Paid rows are never auto-closed. */
+  function setAgentTrial(aid) {
+    if (!confirm('ဒီ agent ကို စမ်း ၇ ရက် ပေးမလား?')) return;
+    pbReq('PATCH', '/collections/3d_agents/records/' + encodeURIComponent(aid), { trialUntil: Date.now() + 7 * 86400000 }).then(function () { renderMyAgentList(); })
+    .catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
+  }
+  function clearAgentTrial(aid) {
+    if (!confirm('ဒီ agent ကို paid ဖြစ်အောင် ပြောင်းမလား? (စမ်း အကန့် ဖြုတ်မယ်)')) return;
+    pbReq('PATCH', '/collections/3d_agents/records/' + encodeURIComponent(aid), { trialUntil: null }).then(function () { renderMyAgentList(); })
+    .catch(function (e) { $('buyerStatus').textContent = 'မရဘူး: ' + (e.message || 'error'); });
+  }
   function deleteAgent(aid, code, tidArg) {
     if (!confirm('ဒီ agent (' + code + ') ကို အပြီးဖျက်မလား? သူ့လူတွေပါ အတွဲလိုက် ပျက်မယ်။')) return;
     var n = agentNumFromCode(code);
@@ -1693,10 +1715,15 @@
       var html = '';
       items.forEach(function (a) {
         var dis = !!a.disabled;
-        html += '<div class="setrow"><span>' + esc(a.name || '') + '</span><span class="' + (dis ? 'neg' : 'pos') + '">' + (dis ? 'ပိတ်' : 'ဖွင့်') + '</span></div>' +
+        var tu = a.trialUntil;
+        var trialTxt = '';
+        if (tu) { var dl = Math.ceil((tu - Date.now()) / 86400000); trialTxt = dl > 0 ? ('စမ်း ' + dl + ' ရက် ကျန်') : 'စမ်း ရက်ပြည့်'; }
+        html += '<div class="setrow"><span>' + esc(a.name || '') + '</span><span class="' + (dis ? 'neg' : 'pos') + '">' + (dis ? 'ပိတ်' : 'ဖွင့်') + '</span>' + (trialTxt ? '<span>' + trialTxt + '</span>' : '') + '</div>' +
           '<div class="status">Code: <b>' + esc(a.code || '') + '</b></div>' +
           '<div class="btnrow"><button class="btn ' + (dis ? 'gray' : '') + '" data-myagent-toggle="' + a.id + '" data-disable="' + (dis ? '0' : '1') + '" data-code="' + esc(a.code || '') + '">' + (dis ? 'ဖွင့်' : 'ပိတ်') + '</button>' +
-          '<button class="btn gray" data-myagent-del="' + a.id + '" data-code="' + esc(a.code || '') + '">ဖျက်</button></div>';
+          '<button class="btn gray" data-myagent-del="' + a.id + '" data-code="' + esc(a.code || '') + '">ဖျက်</button>' +
+          '<button class="btn gray" data-myagent-trial="' + a.id + '">စမ်း ၇ ရက်</button>' +
+          (tu ? '<button class="btn gray" data-myagent-paid="' + a.id + '">paid ဖြစ်</button>' : '') + '</div>';
       });
       box.innerHTML = html;
       box.querySelectorAll('[data-myagent-toggle]').forEach(function (btn) {
@@ -1704,6 +1731,12 @@
       });
       box.querySelectorAll('[data-myagent-del]').forEach(function (btn) {
         btn.addEventListener('click', function () { deleteAgent(btn.getAttribute('data-myagent-del'), btn.getAttribute('data-code'), tid); });
+      });
+      box.querySelectorAll('[data-myagent-trial]').forEach(function (btn) {
+        btn.addEventListener('click', function () { setAgentTrial(btn.getAttribute('data-myagent-trial')); });
+      });
+      box.querySelectorAll('[data-myagent-paid]').forEach(function (btn) {
+        btn.addEventListener('click', function () { clearAgentTrial(btn.getAttribute('data-myagent-paid')); });
       });
     }).catch(function (e) {
       box.innerHTML = '<div class="status">မရဘူး: ' + esc(e.message || 'error') + '</div>';
