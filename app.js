@@ -296,9 +296,21 @@
   /* ---------- navigation ---------- */
   var currentSec = 'home';
   function go(secName) {
+    var prevSec = currentSec;
     currentSec = secName;
     document.querySelectorAll('.sec').forEach(function (el) { el.classList.remove('on'); });
     $('sec-' + secName).classList.add('on');
+    /* Sync-fix Nov 2: pull fresh server data when the ledger view
+       OPENS (transition only, never on render) so Master sees agent
+       saves without a manual ref. Fire-and-forget; the _syncing
+       guard skips it while another sync runs. */
+    if (secName === 'ledger' && prevSec !== 'ledger' && window.Sync3D && window.Sync3D.isLoggedIn()) {
+      try {
+        window.Sync3D.refreshSessions(state).then(function () {
+          return window.Sync3D.pullUpdates(state, syncAfter);
+        }).then(function () { renderSyncStatus(); render(); }).catch(function () {});
+      } catch (e) {}
+    }
     render();
   }
   document.querySelectorAll('[data-go]').forEach(function (el) {
