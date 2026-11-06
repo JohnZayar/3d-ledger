@@ -140,7 +140,7 @@
     if (!tok) return;
     var out = [], page = 1;
     function next() {
-      return fetch('https://2d.skylinkvpn.stream/api/collections/3d_acks/records?page=' + page + '&perPage=200', { headers: { Authorization: tok } })
+      return fetch('https://api.23ledger.com/api/collections/3d_acks/records?page=' + page + '&perPage=200', { headers: { Authorization: tok } })
         .then(function (res) { return res.json(); })
         .then(function (d) {
           out = out.concat(d.items || []);
