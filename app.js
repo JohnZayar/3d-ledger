@@ -160,7 +160,7 @@
     var tok = null;
     try { var a = JSON.parse(localStorage.getItem('3dMasterAuth') || 'null'); tok = a && a.token; } catch (e) {}
     if (!tok) return 0;
-    var url = 'https://2d.skylinkvpn.stream/api/collections/3d_people/records?perPage=200';
+    var url = 'https://api.23ledger.com/api/collections/3d_people/records?perPage=200';
     if (myTenant) url += '&filter=' + encodeURIComponent('tenant="' + myTenant + '"');
     function done() { agentPeopleServerCheck = null; }
     agentPeopleServerCheck = fetch(url, { headers: { Authorization: tok } })
@@ -197,7 +197,7 @@
     var tok = null;
     try { var a = JSON.parse(localStorage.getItem('3dMasterAuth') || 'null'); tok = a && a.token; } catch (e) {}
     if (!tok) return;
-    fetch('https://2d.skylinkvpn.stream/api/collections/3d_agents/records?perPage=200', { headers: { Authorization: tok } })
+    fetch('https://api.23ledger.com/api/collections/3d_agents/records?perPage=200', { headers: { Authorization: tok } })
       .then(function (res) { return res.json(); })
       .then(function (d) {
         var map = {};
@@ -1409,7 +1409,7 @@
      it from the Buyer list. Direct PB calls (not the
      sync queue): buyer/agent management is admin work, and the
      queue only carries sessions/people/records. */
-  var PB_BASE = 'https://2d.skylinkvpn.stream/api';
+  var PB_BASE = 'https://api.23ledger.com/api';
   function pbToken() {
     try { var a = JSON.parse(localStorage.getItem('3dMasterAuth') || 'null'); return a && a.token; } catch (e) { return null; }
   }
