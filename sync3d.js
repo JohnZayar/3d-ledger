@@ -1,4 +1,4 @@
-/* Sync3D v5 (Pho Nov 2) — shared by 3D Master + 3D Agent.
+/* Sync3D v6 (Pho Nov 2) — shared by 3D Master + 3D Agent.
    Plain script, no modules (the 3D apps are plain-script apps).
    Mirrors the Pho-approved 2D sync-simple design, adapted for 3D:
    - Server-ID-only FIFO queue, local id IS the PocketBase record id.
@@ -21,7 +21,7 @@
    Sync3D.queue(op, coll, localId, obj), Sync3D.syncNow(state, saveFn). */
 (function () {
   'use strict';
-  var PB = 'https://2d.skylinkvpn.stream/api';
+  var PB = 'https://api.23ledger.com/api';
   var _syncing = false, _lastPushError = null, _lastPullError = null;
   var _cfg = { role: 'master', authKey: '3dSyncAuth', queueKey: '3dSyncQueue', metaKey: '3dSyncMeta' };
   var _autoStarted = false;
