@@ -282,6 +282,9 @@
     var t = sessRecords().reduce(function (a, r) { return a + r.amount; }, 0);
     $('homeTotal').textContent = fmt(t);
     var cs = $('agentCodeShow'); if (cs) cs.textContent = state.agentCode || '—';
+    var nm = agentName();
+    var ns = $('agentNameShow'); if (ns) ns.textContent = nm || '—';
+    var hn = $('hdrAgentName'); if (hn) hn.textContent = nm ? ('· ' + nm) : '';
     renderTrialBanner();
   }
 
@@ -289,6 +292,14 @@
   // Pho Oct 24 (သတ်သတ်စီ): the Agent shows ONLY its own bettors.
   // Master people, other agents' bettors and agent-registry rows
   // never list here — each agent's list is its own alone.
+  /* Agent's own name (Pho Nov 14): show it in the header + Settings so
+     a wrong agent code is visible at once — a mistyped code finds no
+     agent record, so the name shows '—' instead of silently staying
+     local-only (Moe's code was missing 'z', Nov 14). */
+  function agentName() {
+    var ap = state.people.find(function (p) { return p.role === 'agent' && p.agentId === state.agentCode; });
+    return ap ? ap.name : null;
+  }
   function agentVisiblePeople() { return state.people.filter(function (p) { return p.role !== 'agent' && p.agentId === state.agentCode; }); }
   function renderPeople() {
     var opts = agentVisiblePeople().map(function (p) {
