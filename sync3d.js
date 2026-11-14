@@ -234,6 +234,7 @@
       return {
         name: o.name, payout: o.payout, tote: o.tote || 0, commission: o.commission,
         closedLimit: (o.closedLimit == null ? null : o.closedLimit),
+        personLimit: (o.personLimit == null ? null : o.personLimit),
         role: o.role || 'bettor', agentId: o.agentId || agentCode || '', tenant: tenant
       };
     }
@@ -261,6 +262,7 @@
     return {
       id: item.id, name: item.name, payout: item.payout, tote: item.tote || 0,
       commission: item.commission, closedLimit: (item.closedLimit == null ? null : item.closedLimit),
+      personLimit: (item.personLimit == null ? null : item.personLimit),
       role: item.role || 'bettor', agentId: item.agentId || null
     };
   }

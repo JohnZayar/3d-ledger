@@ -23,8 +23,17 @@
     return c.getFullYear() + '-' + p(c.getMonth() + 1) + '-' + p(c.getDate());
   }
   function seed() {
-    var s = { id: uid(), date: nextDraw(todayISO()), limit: 50000, winning: null, closed: false };
+    var s = { id: uid(), date: nextDraw(todayISO()), limit: 0, winning: null, closed: false };
     return { people: [], sessions: [s], currentSessionId: s.id, records: [] };
+  }
+  /** Last entered session Limit (Pho Nov 14): a new session carries
+   * forward the latest session's Limit — never an auto value.
+   * 0 when no Limit has ever been entered. */
+  function lastSessionLimit() {
+    var latest = null;
+    state.sessions.forEach(function (s) { if (!latest || s.date > latest.date) latest = s; });
+    var v = latest ? Number(latest.limit) || 0 : 0;
+    return v > 0 ? v : 0;
   }
   function load() {
     try {
@@ -174,10 +183,10 @@
           if (agentPersonFor(it.code)) return;
           var srv = serverByCode[it.code];
           if (srv) {
-            state.people.push({ id: srv.id, name: srv.name, payout: srv.payout, tote: srv.tote || 0, commission: srv.commission, closedLimit: (srv.closedLimit == null ? null : srv.closedLimit), role: srv.role || 'agent', agentId: srv.agentId });
+            state.people.push({ id: srv.id, name: srv.name, payout: srv.payout, tote: srv.tote || 0, commission: srv.commission, closedLimit: (srv.closedLimit == null ? null : srv.closedLimit), personLimit: (srv.personLimit == null ? null : srv.personLimit), role: srv.role || 'agent', agentId: srv.agentId });
             changed = true;
           } else {
-            var np = { id: uid(), name: it.name || agentName(it.code), role: 'agent', payout: 0, tote: 0, commission: 0, closedLimit: null, agentId: it.code };
+            var np = { id: uid(), name: it.name || agentName(it.code), role: 'agent', payout: 0, tote: 0, commission: 0, closedLimit: null, personLimit: null, agentId: it.code };
             state.people.push(np);
             Q('create', '3d_people', np.id, np);
             changed = true;
@@ -350,7 +359,7 @@
     var ex = state.sessions.find(function (s) { return s.date === nd; });
     if (ex) { state.currentSessionId = ex.id; }
     else {
-      var s = { id: uid(), date: nd, limit: 50000, winning: null, closed: false };
+      var s = { id: uid(), date: nd, limit: lastSessionLimit(), winning: null, closed: false };
       state.sessions.push(s);
       Q('create', '3d_sessions', s.id, s);
       state.sessions.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
@@ -397,7 +406,7 @@
     var listVis = listPeople();
     $('peopleList').innerHTML = listVis.map(function (p) {
       return '<div class="prow" data-pid="' + p.id + '">' + (p.role === 'akan' ? '<span class="tag">အကန်</span>' : '') + (p.role === 'agent' ? '<span class="tag">Agent</span>' : '') + '<span class="nm">' + esc(p.name) + '</span>' +
-        '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '-' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' + (p.closedLimit != null ? '<span>ပိတ် ' + esc(fmt(p.closedLimit)) + '</span>' : '') + '</div>';
+        '<span>အဆ ' + esc(fmt(p.payout)) + (p.tote ? '-' + esc(fmt(p.tote)) : '') + '</span><span>ကော် ' + esc(fmt(p.commission)) + '%</span>' + (p.personLimit != null ? '<span>Limit ' + esc(fmt(p.personLimit)) + '</span>' : '') + (p.closedLimit != null ? '<span>ပိတ် ' + esc(fmt(p.closedLimit)) + '</span>' : '') + '</div>';
     }).join('');
     // Long-press a row (Pho Oct 22): edit / delete menu, same pattern
     // as the voucher line menu.
@@ -432,10 +441,12 @@
     }
     var pcEl = $('pClosed');
     var closedLimit = (pcEl && pcEl.value.trim() !== '') ? Number(normNum(pcEl.value)) : null;
-    var np = { id: uid(), name: name, payout: payout, tote: tote, commission: comm, role: $('pRole').value, closedLimit: closedLimit };
+    var plEl = $('pLimit');
+    var personLimit = (plEl && plEl.value.trim() !== '') ? Number(normNum(plEl.value)) : null;
+    var np = { id: uid(), name: name, payout: payout, tote: tote, commission: comm, role: $('pRole').value, closedLimit: closedLimit, personLimit: personLimit };
     state.people.push(np);
     Q('create', '3d_people', np.id, np);
-    $('pName').value = ''; $('pPayout').value = ''; $('pComm').value = ''; if (pcEl) pcEl.value = '';
+    $('pName').value = ''; $('pPayout').value = ''; $('pComm').value = ''; if (pcEl) pcEl.value = ''; if (plEl) plEl.value = '';
     $('peopleStatus').textContent = '';
     save(); render();
   });
@@ -787,7 +798,7 @@
     if (!valid.length) return;
     var s = sess();
     var newItems = [];
-    valid.forEach(function (r) { r.items.forEach(function (it) { newItems.push(it); }); });
+    valid.forEach(function (r) { r.items.forEach(function (it) { newItems.push({ number: it.number, amount: it.amount, isFormula: r.kind !== 'single' }); }); });
     // Master agent entry (Pho Oct 31): selecting an agent row enters
     // under the agent name — no bettor split. The aggregate cap
     // (agentClosedViolation) applies, not the per-person check.
@@ -795,6 +806,8 @@
     var selAgentCode = (selPerson && selPerson.agentId) || null;
     var badC = selAgentCode ? agentClosedViolation(selAgentCode, newItems, null) : closedViolation(pid, newItems, null);
     if (badC) { showExcl(badC); return; }
+    var badL = selAgentCode ? agentLimitViolation(selAgentCode, newItems, null) : limitViolation(pid, newItems, null);
+    if (badL) { showExcl(badL); return; }
     var batchNo = 1;
     sessRecords().forEach(function (r) {
       if (r.personId === pid && r.batchNo >= batchNo) batchNo = r.batchNo + 1;
@@ -1154,6 +1167,11 @@
     var badA = recs[0].agentId ? agentClosedViolation(recs[0].agentId, r.items, menuLineId) : null;
     if (badA) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + (badA.all || [badA.n]).join('/') + exclTag(badA); return; }
     if (badL) { $('lmHint').textContent = 'ပိတ်ဂဏန်း ' + (badL.all || [badL.n]).join('/') + exclTag(badL); return; }
+    var limItems = r.items.map(function (it) { return { number: it.number, amount: it.amount, isFormula: r.kind !== 'single' }; });
+    var badLim = recs[0].agentId ? null : limitViolation(recs[0].personId, limItems, menuLineId);
+    var badLimA = recs[0].agentId ? agentLimitViolation(recs[0].agentId, limItems, menuLineId) : null;
+    if (badLimA) { $('lmHint').textContent = 'Limit ' + (badLimA.all || [badLimA.n]).join('/') + exclTag(badLimA); return; }
+    if (badLim) { $('lmHint').textContent = 'Limit ' + (badLim.all || [badLim.n]).join('/') + exclTag(badLim); return; }
     var first = recs[0];
     var idx = state.records.indexOf(first);
     state.records = state.records.filter(function (x) { return x.lineId !== menuLineId; });
@@ -1208,6 +1226,7 @@
     $('pmPayout').value = p.payout + (p.tote ? '-' + p.tote : '');
     $('pmComm').value = p.commission;
     $('pmClosed').value = p.closedLimit == null ? '' : p.closedLimit;
+    $('pmLimit').value = p.personLimit == null ? '' : p.personLimit;
     $('pmHint').textContent = '';
   });
   on('pmBackBtn', 'click', function () {
@@ -1234,6 +1253,9 @@
     var pcv = $('pmClosed').value.trim();
     var cl = Number(normNum(pcv));
     p.closedLimit = (pcv === '' || isNaN(cl)) ? null : cl;
+    var plv = $('pmLimit').value.trim();
+    var pl = Number(normNum(plv));
+    p.personLimit = (plv === '' || isNaN(pl)) ? null : pl;
     Q('update', '3d_people', p.id, p);
     save(); render(); closePersonMenu();
   });
@@ -1276,7 +1298,7 @@
   function hideExcl() { exclPending = null; var b = $('exclSaveBtn'); if (b) b.style.display = 'none'; }
   function showExcl(bad) {
     exclPending = bad;
-    $('entryStatus').textContent = 'ပိတ်ဂဏန်း ' + (bad.all || [bad.n]).join('/');
+    $('entryStatus').textContent = (bad.kind === 'limit' ? 'Limit ' : 'ပိတ်ဂဏန်း ') + (bad.all || [bad.n]).join('/');
     var b = $('exclSaveBtn'); if (b) b.style.display = '';
   }
   function closedViolation(pid, items, excludeLineId) {
@@ -1326,6 +1348,62 @@
     Object.keys(sums).forEach(function (n) {
       var tot = (existing[n] || 0) + sums[n];
       if (tot > ap.closedLimit) { if (!bad) bad = { n: n, cap: ap.closedLimit, tot: tot }; all.push(n); }
+    });
+    if (bad) bad.all = all;
+    return bad;
+  }
+  // Per-person cumulative Limit (Pho Nov 14): the person's total on
+  // ONE number in this session (saved + new, direct bets only —
+  // formula bets exempt) must not exceed their Limit (blank = no cap).
+  // Applies to ALL numbers, not only the blocked list. Same block UI
+  // as the closed-number cap: short message + one-tap exclude-and-save.
+  function limitViolation(pid, items, excludeLineId) {
+    var p = person(pid);
+    if (!p || p.personLimit == null) return null;
+    var sums = {};
+    (items || []).forEach(function (it) {
+      if (it.isFormula) return;
+      sums[it.number] = (sums[it.number] || 0) + it.amount;
+    });
+    if (!Object.keys(sums).length) return null;
+    var existing = {};
+    sessRecords().forEach(function (r) {
+      if (r.personId !== pid) return;
+      if (r.isFormula) return;
+      if (excludeLineId && r.lineId === excludeLineId) return;
+      existing[r.number] = (existing[r.number] || 0) + r.amount;
+    });
+    var bad = null, all = [];
+    Object.keys(sums).forEach(function (n) {
+      var tot = (existing[n] || 0) + sums[n];
+      if (tot > p.personLimit) { if (!bad) bad = { n: n, cap: p.personLimit, tot: tot, kind: 'limit' }; all.push(n); }
+    });
+    if (bad) bad.all = all;
+    return bad;
+  }
+  // Agent aggregate Limit (Pho Nov 14): the agent-person's Limit caps
+  // the AGENT's total for a number across all its bettors in the
+  // session (not per bettor) — same shape as agentClosedViolation.
+  function agentLimitViolation(code, items, excludeLineId) {
+    var ap = agentPersonFor(code);
+    if (!ap || ap.personLimit == null) return null;
+    var sums = {};
+    (items || []).forEach(function (it) {
+      if (it.isFormula) return;
+      sums[it.number] = (sums[it.number] || 0) + it.amount;
+    });
+    if (!Object.keys(sums).length) return null;
+    var existing = {};
+    sessRecords().forEach(function (r) {
+      if (r.agentId !== code) return;
+      if (r.isFormula) return;
+      if (excludeLineId && r.lineId === excludeLineId) return;
+      existing[r.number] = (existing[r.number] || 0) + r.amount;
+    });
+    var bad = null, all = [];
+    Object.keys(sums).forEach(function (n) {
+      var tot = (existing[n] || 0) + sums[n];
+      if (tot > ap.personLimit) { if (!bad) bad = { n: n, cap: ap.personLimit, tot: tot, kind: 'limit' }; all.push(n); }
     });
     if (bad) bad.all = all;
     return bad;
