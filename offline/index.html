@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Master</title>
+<link rel="stylesheet" href="style.css?v=31">
+</head>
+<body>
+<div class="app">
+
+  <div class="hdr"><div class="brand"><img class="badge-img" src="logo.png" alt="3D"><b>3D <span class="g">MASTER</span></b></div><span id="hdrDate"></span></div>
+
+
+
+  <!-- ပင်မ -->
+  <section class="sec" id="sec-home">
+  <div class="sessbar">
+    <select id="sessSel"></select>
+    <button class="sbtn" id="newSessBtn">ပွဲစဉ် အသစ်</button>
+  </div>
+    <div class="grid2">
+      <div class="tile gold" data-go="entry"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>ထိုးကွက် တင်</div>
+      <div class="tile" data-go="ledger"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>လယ်ဂျာ</div>
+      <div class="tile" data-go="win"><svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 6H4a2 2 0 0 0 0 4h3M17 6h3a2 2 0 0 1 0 4h-3"/></svg>ပေါက်သီး</div>
+      <div class="tile" data-go="voucher"><svg viewBox="0 0 24 24"><path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2.5 2.5 0 0 0 0 5v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1a2.5 2.5 0 0 0 0-5Z"/><path d="M13 6v2M13 11v2M13 16v2"/></svg>ဘောက်ချာ</div>
+      <div class="tile" data-go="over"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 14l5-6 4 3 5-7"/><path d="M15 4h5v5"/></svg>အကျွံ</div>
+      <div class="tile" data-go="blocked"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg>ဒိုင်ပိတ်</div>
+      <div class="tile" data-go="people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 20c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M16 5.5a3.5 3.5 0 0 1 0 6.5M17.5 15.3c1.7.7 2.7 2.3 3 4.7"/></svg>လူစာရင်း</div>
+      <div class="tile" data-go="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2Z"/></svg>ဆက်တင်</div>
+      <div class="tile" data-go="daily"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>အချုပ်</div>
+    </div>
+    <div class="total"><div class="tlab">တက်ငွေ</div><div class="tamt"><b id="homeTotal">0</b><span>ကျပ်</span></div></div>
+    <button class="btn" data-go="notice" style="margin-top:10px">ဖော်မြူလာ အသုံးပြုပုံ (Notice)</button>
+  </section>
+
+  <!-- ထိုးကွက် တင် -->
+  <section class="sec" id="sec-entry">
+    <div class="backrow ehead"><span class="back" data-go="home">&larr;</span><select class="inp" id="entryPerson"></select><button class="kbt" id="kbToggle" type="button">⌨</button></div>
+    <textarea class="ta board" id="board" inputmode="none" placeholder="123@500"></textarea>
+    <div class="boardbar"><span>Last: <b id="lastTotal">0</b></span><span><b id="boardCount">0</b> ကွက် · Total <b id="boardTotal">0</b></span></div>
+    <div class="prev" id="preview" style="display:none"></div>
+    <div class="bad" id="badbox" style="display:none"></div>
+    <div class="btnrow"><button class="btn gray" id="scanBtn">စကန်</button><button class="btn gray" id="overBtn">အကျွံ</button><input type="file" id="scanFile" accept="image/*" style="display:none"><input type="file" id="scanCam" accept="image/*" capture="environment" style="display:none"><button class="btn" id="saveBtn" disabled>သိမ်းမည်</button></div>
+    <div id="scanChoice" style="display:none" class="btnrow"><button class="btn gray" id="scanCamBtn">ကင်မရာ</button><button class="btn gray" id="scanPhotoBtn">Photo</button></div>
+    <button class="btn" id="exclSaveBtn" style="display:none">ဖယ်ထုတ်ပြီး သိမ်း</button>
+    <div class="status" id="entryStatus"></div>
+    <style>.krow.scroll{display:flex;gap:6px;margin-bottom:6px}.kscroll{display:flex;gap:6px;overflow-x:auto;flex:1;-webkit-overflow-scrolling:touch}.kscroll .k{flex:0 0 auto;padding:6px 12px;font-size:14px}.krow.scroll>.k.sym{flex:0 0 auto;padding:11px 30px;font-size:19px}.kscroll::-webkit-scrollbar{height:3px}.kscroll::-webkit-scrollbar-thumb{background:#c9a227;border-radius:2px}</style>
+    <div class="kb" id="kb" style="display:none">
+      <div class="krow scroll">
+        <div class="kscroll">
+          <div class="k fn" data-t="ထိပ်">ထိပ်</div><div class="k fn" data-t="နောက်">နောက်</div><div class="k fn" data-t="အလယ်">အလယ်</div><div class="k fn" data-t="စီးရီး">စီးရီး</div><div class="k fn" data-t="အခွ">အခွ</div><div class="k fn" data-t="ဒဲ့">ဒဲ့</div><div class="k fn" data-t="ကျန်">ကျန်</div><div class="k fn" data-t="ရှေ့ပူး">ရှေ့ပူး</div><div class="k fn" data-t="နောက်ပူး">နောက်ပူး</div><div class="k fn" data-t="R">R</div><div class="k fn" data-t="ထွိုင်">ထွိုင်</div><div class="k fn" data-t="ရာပြည့်">ရာပြည့်</div><div class="k fn" data-t="အပါ">အပါ</div><div class="k fn" data-t="ဘရိတ်">ဘရိတ်</div>
+        </div>
+        <div class="k sym" data-t="⌫">⌫</div>
+      </div>
+      <div class="krow">
+        <div class="k" data-t="7">7</div><div class="k" data-t="8">8</div><div class="k" data-t="9">9</div>
+        <div class="k sym" data-t="=">=</div>
+      </div>
+      <div class="krow">
+        <div class="k" data-t="4">4</div><div class="k" data-t="5">5</div><div class="k" data-t="6">6</div>
+        <div class="k sym" data-t=".">.</div>
+      </div>
+      <div class="krow">
+        <div class="k" data-t="1">1</div><div class="k" data-t="2">2</div><div class="k" data-t="3">3</div>
+        <div class="k sym" data-t="/">/</div>
+      </div>
+      <div class="krow">
+        <div class="k" data-t="0" style="flex:1.5">0</div><div class="k" data-t="000" style="flex:1.5">000</div>
+        <div class="k wide" data-t=" ">space</div>
+        <div class="k sym" data-t="⏎">⏎</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- လယ်ဂျာ -->
+  <section class="sec" id="sec-ledger">
+    <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>လယ်ဂျာ</h2></div>
+    <div class="statrow"><span>All Total <b id="ledTotal">0</b></span><span>အကွက် <b id="ledCount">0</b></span><button class="limitbtn" id="limitBtn">Limit 50,000</button></div>
+    <div class="digits" id="digits"></div>
+    <div class="ledger" id="ledgerGrid"></div>
+  </section>
+
+  <!-- ပေါက်သီး -->
+  <section class="sec" id="sec-win">
+    <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ပေါက်သီး</h2></div>
+    <input class="inp" id="winInput" inputmode="numeric" maxlength="3" placeholder="000">
+    <button class="btn" id="winBtn">သိမ်းမည်</button>
+    <div class="status" id="winStatus"></div>
+  </section>
+
+  <!-- နေ့ချုပ် -->
+  <section class="sec" id="sec-daily">
+    <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>အချုပ်</h2></div>
+    <div id="dailyBox"></div>
+  </section>
+
+  <!-- ဘောက်ချာ -->
+  <section class="sec" id="sec-voucher">
+    <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဘောက်ချာ</h2></div>
+    <select class="inp" id="voucherPerson"></select>
+    <div id="voucherBox"></div>
+  </section>
+
+  <!-- အကျွံ -->
+  <section class="sec" id="sec-over">
+    <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>အကျွံ</h2></div>
+    <div id="overBox"></div>
+    <button class="btn" id="overCopyBtn" style="display:none">Copy အကျွံ</button>
+    <textarea class="ta" id="overText" readonly style="display:none;margin-top:9px;min-height:80px"></textarea>
+    <div class="status" id="overStatus"></div>
+  </section>
+
+  <!-- ဒိုင်ပိတ် -->
+  <section class="sec" id="sec-blocked">
+    <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဒိုင်ပိတ် ဂဏန်း</h2></div>
+    <div class="frow"><input class="inp" id="blockedInput" placeholder="ဂဏန်း (527, 325 ...)"><button class="sbtn" id="blockedAdd">ထည့်</button></div>
+    <div class="status" id="blockedStatus"></div>
+    <div id="blockedList"></div>
+    <div class="bhint">ဒီ ပွဲစဉ် အတွက် ပဲ — ဂဏန်း ကို နှိပ် ရင် ပြန် ဖြုတ် မယ်</div>
+  </section>
+
+  <!-- လူစာရင်း -->
+  <section class="sec" id="sec-people">
+    <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>လူစာရင်း</h2></div>
+    <input class="inp" id="pName" placeholder="အမည်">
+    <select class="inp" id="pRole"><option value="bettor">ထိုးသား</option><option value="akan">အကန်ဒိုင်</option></select>
+    <div class="frow">
+      <input class="inp" id="pPayout" type="text" inputmode="numeric" placeholder="အဆ-တွဒ် (550-10)">
+      <input class="inp" id="pComm" type="number" inputmode="numeric" placeholder="ကော်% (25/15/10)">
+    </div>
+    <input class="inp" id="pClosed" type="number" inputmode="numeric" placeholder="ပိတ်ဂဏန်း limit တကွက် (ဗလာ = limit မရှိ)">
+    <button class="btn" id="addPersonBtn">ထည့်မည်</button>
+    <div class="status" id="peopleStatus"></div>
+    <div id="peopleList" style="margin-top:10px"></div>
+  </section>
+
+  <!-- ဆက်တင် -->
+  <section class="sec" id="sec-settings">
+    <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဆက်တင်</h2></div>
+    <div class="setrow"><span>App Version</span><b>Offline v2.9</b></div>
+    <div class="setrow"><span>ပွဲစဉ်</span><button class="danger" id="closeToggle">ပွဲစဉ် ပိတ်မည်</button></div>
+    <div class="setrow"><span>App Reset</span><button class="danger" id="resetBtn">အကုန် ရှင်း</button></div>
+  </section>
+
+  <!-- ဖော်မြူလာ အသုံးပြုပုံ (Notice) -->
+  <section class="sec" id="sec-notice">
+    <div class="backrow"><span class="back" data-go="home">&larr;</span><h2>ဖော်မြူလာ အသုံးပြုပုံ</h2></div>
+    <p class="nintro">လိုင်း တစ်လိုင်း = ဂဏန်း + ငွေ။ ငွေ က တစ်ကွက်စာ — ထွက်တဲ့ ဂဏန်း တစ်လုံး စီ အဲ့ ငွေ ရတယ်။ ကွက် = ထွက်တဲ့ ဂဏန်း အရေအတွက်။ အောက် က ဥပမာ အားလုံး parser နဲ့ စစ်ပြီးသား။</p>
+
+    <h3 class="nh">၁။ အခြေခံ — ဂဏန်းတလုံး</h3>
+    <div class="gex"><b>123=500</b> → 1 ကွက် · 500</div>
+    <p>ဂဏန်းနဲ့ငွေကြား <b>=</b> ဒါမှမဟုတ် <b>space</b> ခံပေးတယ်: <b>123 500</b> လည်း အတူတူ။</p>
+
+    <h3 class="nh">၂။ စာရင်း — ဂဏန်း အများကြီး တစ်လိုင်း</h3>
+    <div class="gex"><b>123,456=500</b> → 2 ကွက် · 1,000</div>
+    <p>ကြား separator: <b>- ~ , . * : /</b> ရ။ <b>=</b> နဲ့ ဆက်ရေးရင် နောက် ဆုံး ငွေ အတူတူ ရတယ်: <b>750=755=214=1000</b> → 3 ကွက် · 3,000။</p>
+
+    <h3 class="nh">၃။ ပတ်လည် — ဂဏန်း လှည့်</h3>
+    <div class="gex"><b>123@500</b> → 6 ကွက် · 3,000 (123 132 213 231 312 321)</div>
+    <p>marker: <b>@ R r အာ</b>။ ဂဏန်း ထပ်ရင် ကွက် လျော့တယ်: <b>113@500</b> → 3 ကွက် · 1,500 (113 131 311)။</p>
+
+    <h3 class="nh">၄။ ဒဲ့ + ကျန် — ဈေး ၂ မျိုး</h3>
+    <div class="gex"><b>123ဒဲ့1000အာ500</b> → 123 က 1,000, ကျန် 5 လုံး က 500 စီ = 6 ကွက် · 3,500</div>
+    <p><b>ကျန် / ကျန်အာ</b> လည်း အတူတူ။ စာရင်း + split: <b>123-531-487=6000R1000</b> → စာရင်း 3 လုံး 6,000 စီ + ကျန် perms 15 လုံး 1,000 စီ = 18 ကွက် · 33,000။</p>
+    <p>Rule B: တဆက်တည်း တူ digit-set တွေ က တစ်အုပ်: <b>236-263=5000ကျန်1000</b> → 2 လုံး 5,000 + ကျန် 4 လုံး 1,000 = 6 ကွက် · 14,000။ တခြား set ကြားခံရင် အုပ် ပြတ်တယ်။</p>
+
+    <h3 class="nh">၅။ / နဲ့ စီးရီး</h3>
+    <div class="gex"><b>/23=500</b> → 023…923 = 10 ကွက် · 5,000</div>
+    <p><b>/</b> = ဂဏန်း 0-9 တစ်လုံး ကိုယ်စား။ 2-digit + စီးရီး: <b>29ထိပ်စီးရီး500</b> → 029…929 (10)၊ <b>29နောက်စီးရီး500</b> → 290…299 (10)၊ <b>29အလယ်စီးရီး500</b> → 209…299 (10)။</p>
+
+    <h3 class="nh">၆။ ထိပ် / နောက် / အလယ် — 100 ကွက်</h3>
+    <div class="gex"><b>5ထိပ်500</b> → 500…599 = 100 ကွက် · 50,000</div>
+    <p><b>5နောက်500</b> → 005…995 (100)၊ <b>5အလယ်500</b> → 050…959 ပုံစံ (100)။ ရှေ့ = ထိပ်၊ လယ် = အလယ်။</p>
+
+    <h3 class="nh">၇။ ပူး — ၂ လုံး တူ</h3>
+    <div class="gex"><b>နောက်ပူး500</b> → 100 ကွက် · 50,000 (နောက် 2 လုံး တူ XYY)</div>
+    <p><b>ထိပ်ပူး / ရှေ့ပူး</b> = ရှေ့ 2 လုံး တူ (YYX) — 100 ကွက်။ ဂဏန်း + ပူး = 10 ကွက်: <b>5နောက်ပူး500</b> → 055…955၊ <b>5ထိပ်ပူး500</b> → 550…559။ triples ပါတယ်။</p>
+
+    <h3 class="nh">၈။ ထွိုင် + ရာပြည့်</h3>
+    <div class="gex"><b>ထွိုင်500</b> → 000…999 = 10 ကွက် · 5,000</div>
+    <p>/// လည်း အတူတူ။ <b>ရာပြည့်500</b> → 100…900 = 9 ကွက် · 4,500 (000 မပါ)။</p>
+
+    <h3 class="nh">၉။ အခွ — ရှေ့ = နောက်</h3>
+    <div class="gex"><b>အခွ500</b> → 010…989 = 90 ကွက် · 45,000</div>
+    <p>ရှေ့ = နောက်, အလယ် မတူ (XYX)၊ triples မပါ။ အခွ အပြည့်ရေး — ခွေ ချည်း မရဘူး။</p>
+
+    <h3 class="nh">၁၀။ အပါ — ဂဏန်း ပါတဲ့ အကုန်</h3>
+    <div class="gex"><b>1အပါ500</b> → 271 ကွက် · 135,500 (triples ပါ)</div>
+    <p>အပါ အပြည့်ရေး — ပါ ချည်း မရဘူး။</p>
+
+    <h3 class="nh">၁၁။ ဘရိတ် — digit-sum</h3>
+    <div class="gex"><b>5ဘရိတ်500</b> → 100 ကွက် · 50,000</div>
+    <p>ဂဏန်း 1 လုံး + ဘရိတ် = digit-sum အဲ့ ဂဏန်း နဲ့ ဆုံးတဲ့ အကုန်။ <b>0ဘရိတ် = 10ဘရိတ်</b>၊ <b>ပွင့် = ဘရိတ်</b>။ အလွတ် ဘရိတ် မရှိ — <b>ဘရိတ်500</b> ချည်း မရဘူး။</p>
+
+    <h3 class="nh">၁၂။ Split ဈေး + ကွင်းငွေ</h3>
+    <div class="gex"><b>123=1500/500</b> → ဒဲ့ 1,500 + ကျန် 5 လုံး 500 = 6 ကွက် · 4,000</div>
+    <p><b>123.456(500)</b> / <b>123.456{500}</b> → 2 ကွက် · 1,000။ <b>387...500r100</b> → ဒဲ့ 500 + ကျန် 5 လုံး 100 = 6 ကွက် · 1,000။</p>
+
+    <h3 class="nh">၁၃။ ပိတ်ဂဏန်း ဖယ်နည်း</h3>
+    <div class="gex"><b>5ထိပ်5500{-500}</b> → 99 ကွက် · 544,500</div>
+    <p>ပိတ်ဂဏန်း ပါတဲ့ လိုင်း ပိတ်ခံရရင် <b>{-...}</b> နဲ့ ဖယ်ထုတ်: <b>{-447/474/744}</b> ပုံစံ လည်း ရ။ paste နဲ့ ရိုက် — ကီးဘုတ်မှာ { } မရှိ။</p>
+
+    <h3 class="nh">၁၄။ မရတာများ</h3>
+    <p><b>ဘရိတ်500</b> (အလွတ်)၊ <b>5စီးရီး500</b> (1-digit စီးရီး မရှိ)၊ <b>123.456.500</b> (dots ချည်း ငွေ မပါ) — အကုန် invalid။ ခွေ pool ဖော်မြူလာ မရှိ၊ ထိုင် ဆိုတာ မရှိ။</p>
+
+    <h3 class="nh">၁၅။ တွဒ် အကျဉ်း</h3>
+    <p>ပေါက်ဂဏန်း W ရဲ့ perms (W မပါ) + W-1 + W+1 = တွဒ် set။ အဲ့ ဂဏန်း ထိုးထားရင် stake × တွဒ် rate ရတယ်၊ W ကိုယ်တိုင် က အဆ ရတယ်။</p>
+
+    <p class="nintro">ဒီ လမ်းညွှန် = parser v27 အတိုင်း။ ဖော်မြူလာ အသစ် ထပ်တိုးရင် ဒီဘုတ် မှာ ထပ်ဖြည့်မယ်။</p>
+  </section>
+
+</div>
+
+<!-- Limit dialog -->
+<div class="modal hidden" id="limitModal">
+  <div class="mbox">
+    <h3>Limit</h3>
+    <input class="inp" id="limitInput" type="number" inputmode="numeric" style="margin-bottom:0">
+    <div class="mrow">
+      <button class="sbtn gray" id="limitCancel" style="flex:1">မလုပ်</button>
+      <button class="sbtn" id="limitSave" style="flex:1">သိမ်းမည်</button>
+    </div>
+  </div>
+</div>
+
+<div id="personMenu" class="sheet" style="display:none">
+  <div class="sheetCard">
+    <div class="sheetTitle" id="pmTitle"></div>
+    <div id="pmView">
+      <button class="btn" id="pmEditBtn">ပြင်မည်</button>
+      <button class="btn danger" id="pmDelBtn">ဖျက်မည်</button>
+      <button class="btn gray" id="pmCloseBtn">ပိတ်မည်</button>
+    </div>
+    <div id="pmEdit" style="display:none">
+      <input id="pmName" class="sheetInput" autocomplete="off" placeholder="အမည်">
+      <select id="pmRole" class="sheetInput"><option value="bettor">ထိုးသား</option><option value="akan">အကန်ဒိုင်</option></select>
+      <input id="pmPayout" class="sheetInput" inputmode="numeric" autocomplete="off" placeholder="အဆ-တွဒ် (550-10)">
+      <input id="pmComm" class="sheetInput" inputmode="numeric" autocomplete="off" placeholder="ကော်%">
+      <input id="pmClosed" class="sheetInput" inputmode="numeric" autocomplete="off" placeholder="ပိတ်ဂဏန်း limit (ဗလာ = မရှိ)">
+      <div class="status" id="pmHint"></div>
+      <button class="btn" id="pmSaveBtn">သိမ်းမည်</button>
+      <button class="btn gray" id="pmBackBtn">မသိမ်းတော့</button>
+    </div>
+  </div>
+</div>
+
+<div id="lineMenu" class="sheet" style="display:none">
+  <div class="sheetCard">
+    <div class="sheetTitle" id="lmTitle"></div>
+    <div id="lmView">
+      <button class="btn" id="lmEditBtn">ပြင်မည်</button>
+      <button class="btn danger" id="lmDelBtn">ဖျက်မည်</button>
+      <button class="btn gray" id="lmCloseBtn">ပိတ်မည်</button>
+    </div>
+    <div id="lmEdit" style="display:none">
+      <input id="lmInput" class="sheetInput" autocomplete="off">
+      <div class="status" id="lmHint"></div>
+      <button class="btn" id="lmSaveBtn">သိမ်းမည်</button>
+      <button class="btn gray" id="lmBackBtn">မသိမ်းတော့</button>
+    </div>
+  </div>
+</div>
+
+<!-- All static elements must stay ABOVE these scripts: app.js wires buttons at load time, so anything below never gets listeners (lineMenu buttons were dead, Oct 25). -->
+<script src="parser3d.js?v=30"></script>
+<script src="app.js?v=33"></script>
+<div id="gate" class="gate" style="display:none"></div>
+<script src="gate.js"></script>
+
+</body>
+</html>
