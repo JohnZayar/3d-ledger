@@ -1,4 +1,11 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v31 (Pho, Nov 22): red-lines fix — the multi-number split
+ * branches stole single-number r-splits with 4+-digit amounts
+ * ('671 10000r2000' read 100 as a 2nd number, amount '00' -> red),
+ * so the single-number split now runs BEFORE them; it also tolerates
+ * a stray '/' or '.' between number and amount ('414/ 10000r1000',
+ * '670 .10000r2000'); the split branches accept '/' or '.' before
+ * the first amount ('413 885 000 113 /10000r1000' -> 13, 49000).
  * Parser v30 (Pho, Nov 1): range-as-series + bare-dae —
  * '220မှ229ထိ=100' IS 22နောက်စီးရီး, '022မှ922ထိ=100' IS
  * 22ထိပ်စီးရီး (10 each; ends must differ in one digit
@@ -250,9 +257,35 @@
       return finish([m[1]], dA4, raw, 'single');
     }
 
+    // Single-number spaced split (Pho, Nov 1; moved BEFORE the
+    // multi-number split branches in v31, Pho Nov 22): '104=500 R 200',
+    // '104 500r200', '104 500 R 200' — one number, an amount, then a
+    // split marker and a second amount. The member loop below would
+    // misread the amount as a second number and give listperm 9
+    // (104 + 500/050/005 @200); the space forms would fail outright.
+    // v31: it MUST run before the space/mixed split branches — those
+    // greedily read a 4+-digit amount's leading digits as a second
+    // number ('671 10000r2000' -> numbers 671+100, amount '00' -> red).
+    // v31 also tolerates a stray '/' or '.' between the number and the
+    // amount ('414/ 10000r1000', '670 .10000r2000').
+    m = s.match(/^(\d{3})[\s\/\.]*=\s*(\d+)\s*(?:\u1000\u103b\u1014\u103a\u1021\u102c|\u1000\u103b\u1014\u103a|R|r|\u1021\u102c)\s*(\d+)$/) ||
+        s.match(/^(\d{3})[\s\/\.]+(\d+)\s*(?:\u1000\u103b\u1014\u103a\u1021\u102c|\u1000\u103b\u1014\u103a|R|r|\u1021\u102c)\s*(\d+)$/);
+    if (m) {
+      var dA5 = parseInt(m[2], 10), rA5 = parseInt(m[3], 10);
+      if (!(dA5 > 0) || !(rA5 > 0)) return invalid(raw);
+      var st5 = m[1];
+      var it5 = [{ number: st5, amount: dA5 }];
+      perms3(st5[0], st5[1], st5[2]).forEach(function (pn) {
+        if (pn !== st5) it5.push({ number: pn, amount: rA5 });
+      });
+      var rr5 = finishItems(it5, raw, 'split');
+      rr5.head = 1;
+      return rr5;
+    }
+
     // Space-separated subjects (Pho Oct 22): "567 765 15000k1000"-family.
     // Split with optional kyan-count check + stacked marker.
-    m = s.match(/^(\d{3}(?:\s+\d{3})+?)\s*(\d+)\s*(?:ကျန်အာ|ကျန်|အာ|R|r|@|\/)\s*(?:(\d+)\s*ကွက်\s*)?(\d+)$/);
+    m = s.match(/^(\d{3}(?:\s+\d{3})+?)[\s\/\.]*(\d+)\s*(?:ကျန်အာ|ကျန်|အာ|R|r|@|\/)\s*(?:(\d+)\s*ကွက်\s*)?(\d+)$/);
     if (m) {
       var subs2 = m[1].split(/\s+/);
       var sA = parseInt(m[2], 10), oA = parseInt(m[4], 10);
@@ -266,7 +299,7 @@
       return rS;
     }
     // Space subjects + ကျန်<count>ကွက် form: "567 765 15000k4q5000".
-    m = s.match(/^(\d{3}(?:\s+\d{3})+?)\s*(\d+)ကျန်\s*(\d+)\s*ကွက်\s*(\d+)$/);
+    m = s.match(/^(\d{3}(?:\s+\d{3})+?)[\s\/\.]*(\d+)ကျန်\s*(\d+)\s*ကွက်\s*(\d+)$/);
     if (m) {
       var subs3 = m[1].split(/\s+/);
       var sA3 = parseInt(m[2], 10), cnt3 = parseInt(m[3], 10), oA3 = parseInt(m[4], 10);
@@ -336,28 +369,6 @@
       var sAQ = parseInt(m[2], 10);
       if (!(sAQ > 0)) return invalid(raw);
       return finish(subsQ, sAQ, raw, 'list');
-    }
-
-    // Single-number spaced split (Pho, Nov 1): '104=500 R 200',
-    // '104 500r200', '104 500 R 200' — one number, an amount, then a
-    // split marker and a second amount. The member loop below would
-    // misread the amount as a second number and give listperm 9
-    // (104 + 500/050/005 @200); the space forms would fail outright.
-    // Placed AFTER every specific branch and BEFORE the member loop,
-    // so it steals nothing that already parses.
-    m = s.match(/^(\d{3})\s*=\s*(\d+)\s*(?:\u1000\u103b\u1014\u103a\u1021\u102c|\u1000\u103b\u1014\u103a|R|r|\u1021\u102c)\s*(\d+)$/) ||
-        s.match(/^(\d{3})\s+(\d+)\s*(?:\u1000\u103b\u1014\u103a\u1021\u102c|\u1000\u103b\u1014\u103a|R|r|\u1021\u102c)\s*(\d+)$/);
-    if (m) {
-      var dA5 = parseInt(m[2], 10), rA5 = parseInt(m[3], 10);
-      if (!(dA5 > 0) || !(rA5 > 0)) return invalid(raw);
-      var st5 = m[1];
-      var it5 = [{ number: st5, amount: dA5 }];
-      perms3(st5[0], st5[1], st5[2]).forEach(function (pn) {
-        if (pn !== st5) it5.push({ number: pn, amount: rA5 });
-      });
-      var rr5 = finishItems(it5, raw, 'split');
-      rr5.head = 1;
-      return rr5;
     }
 
     // General member-list parser (Pho's symbol canon, Oct 22):
