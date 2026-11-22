@@ -1,4 +1,4 @@
-/* 3D Master Offline v2.3 - phone-local only, no network (localStorage, PIN/license gate via gate.js). Ported from web Master v58 + parser v27. Network/sync code stripped; Master's own people, ledger, vouchers and limits kept. */
+/* 3D Master Offline v2.10 - phone-local only, no network (localStorage, PIN/license gate via gate.js). Ported from web Master v58 + parser v27. Network/sync code stripped; Master's own people, ledger, vouchers and limits kept. */
 (function () {
   'use strict';
   var LS_KEY = '3dMasterV1';
@@ -150,8 +150,9 @@
     }).join('');
     var ep = $('entryPerson'), vp = $('voucherPerson');
     var keepE = ep.value, keepV = vp.value;
-    ep.innerHTML = vis.length ? opts : '<option value="">—</option>';
-    if (keepE && person(keepE)) ep.value = keepE;
+    ep.innerHTML = (vis.length ? opts : '<option value="">—</option>') + '<option value="__new__">+ လူသစ်…</option>';
+    if (keepE && (keepE === '__new__' || person(keepE))) ep.value = keepE;
+    if (ep.value === '__new__') entryNewPersonShow(true); else entryNewPersonShow(false);
     vp.innerHTML = vis.length ? opts : '<option value="">—</option>';
     if (keepV && person(keepV)) vp.value = keepV;
     // list
@@ -199,6 +200,63 @@
     $('peopleStatus').textContent = '';
     save(); render();
   });
+
+  /* ---------- inline new person (Pho Nov 22, Offline v2.10) ----------
+     "+ လူသစ်…" in the entry dropdown creates the person right
+     there — name only (ported from Online Agent v20, Pho Oct 30:
+     payout/commission edited later in the people list). An
+     exact-match name selects the existing bettor instead of a
+     duplicate. '__new__' can never save as a person (saveBtn guard
+     above + save validation). */
+  var _inlinePrevPerson = '';
+  function entryNewPersonShow(show) {
+    var row = $('entryNewPersonInline');
+    if (row) row.style.display = show ? 'flex' : 'none';
+  }
+  function onEntryPersonChange() {
+    var sel = $('entryPerson');
+    if (!sel) return;
+    if (sel.value === '__new__') {
+      entryNewPersonShow(true);
+      var inp = $('entryNewPersonName');
+      if (inp) inp.focus();
+      return;
+    }
+    _inlinePrevPerson = sel.value || '';
+    entryNewPersonShow(false);
+  }
+  function cancelEntryNewPerson() {
+    entryNewPersonShow(false);
+    var inp = $('entryNewPersonName');
+    if (inp) inp.value = '';
+    var sel = $('entryPerson');
+    if (sel) sel.value = _inlinePrevPerson || '';
+    parseBoard();
+  }
+  function confirmEntryNewPerson() {
+    var inp = $('entryNewPersonName');
+    var name = (inp && inp.value ? inp.value : '').trim();
+    if (!name) { $('entryStatus').textContent = 'နာမည် ထည့်ပါ'; return; }
+    var existing = state.people.find(function (p) { return (p.name || '').trim() === name; });
+    var sel = $('entryPerson');
+    if (existing) {
+      if (inp) inp.value = '';
+      save(); render();
+      if (sel) sel.value = existing.id;
+      entryNewPersonShow(false);
+      parseBoard();
+      return;
+    }
+    var np = { id: uid(), name: name, payout: 0, tote: 0, commission: 0, role: 'bettor', closedLimit: null };
+    state.people.push(np);
+    if (inp) inp.value = '';
+    save(); render();
+    if (sel) sel.value = np.id;
+    entryNewPersonShow(false);
+    parseBoard();
+  }
+  $('entryNewPersonOk').addEventListener('click', confirmEntryNewPerson);
+  $('entryNewPersonCancel').addEventListener('click', cancelEntryNewPerson);
 
   /* ---------- entry board ---------- */
   var lastParse = [];
@@ -266,12 +324,13 @@
       bb.innerHTML = bad.map(function (r) { return '<div data-idx="' + lineIdx[lastParse.indexOf(r)] + '" style="-webkit-touch-callout:none;user-select:none">' + esc(r.formula) + '</div>'; }).join('');
       bb.style.display = 'block';
     } else bb.style.display = 'none';
-    $('saveBtn').disabled = !(valid.length && $('entryPerson').value);
-    if (valid.length && !$('entryPerson').value) {
+    var pidNow = $('entryPerson').value;
+    $('saveBtn').disabled = !(valid.length && pidNow && pidNow !== '__new__');
+    if (valid.length && !pidNow) {
       $('entryStatus').textContent = state.people.length
         ? 'အရင် လူ ရွေးပါ'
         : 'လူ မရှိသေး — လူစာရင်း မှာ အရင် ထည့်ပါ';
-    } else if ($('entryStatus').textContent.indexOf('လူ') === 0 || $('entryStatus').textContent.indexOf('အရင်') === 0) {
+    } else if (pidNow === '__new__' || $('entryStatus').textContent.indexOf('လူ') === 0 || $('entryStatus').textContent.indexOf('အရင်') === 0) {
       $('entryStatus').textContent = '';
     }
     var tc2 = valid.reduce(function (a, r) { return a + r.count; }, 0);
@@ -286,6 +345,7 @@
   $('board').addEventListener('input', parseBoard);
   $('board').addEventListener('input', hideExcl);
   $('entryPerson').addEventListener('change', hideExcl);
+  $('entryPerson').addEventListener('change', onEntryPersonChange);
 
   /* Long-press a preview/badbox row to delete that board line (Pho, Oct 24):
      hold ~0.5s on a row and the line is gone — no confirm, like the
@@ -478,7 +538,7 @@
     hideExcl();
     if (winLocked()) { $('entryStatus').textContent = lockPrefix() + ' — ထိုး မရတော့ပါ'; return; }
     var pid = $('entryPerson').value;
-    if (!pid) return;
+    if (!pid || pid === '__new__') return;
     var valid = lastParse.filter(function (r) { return r.ok; });
     if (!valid.length) return;
     var s = sess();
