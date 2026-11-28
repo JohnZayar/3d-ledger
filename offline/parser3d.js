@@ -1,4 +1,13 @@
 /* 3D formula parser — implements ONLY the confirmed canon (Pho, Oct 22, 2026).
+ * Parser v32 (Pho, Nov 28): separator before the reverse marker is the same
+ * reverse — '245.790.657.r1000', '546,r1500', '789-097-654-r4500' now parse
+ * (the member loop treats a reverse tail after a separator as the tail,
+ * instead of trying to read 'r1000' as another member and failing).
+ * v32b: amount tail after a separator — a space and/or '=' after the
+ * separator marks the amount ('576.879.009.756. 400', '456.667,879,=400',
+ * '576-800-865-790- 700', '790-321-657-=700'); a bare number after a
+ * separator (no space, no '=') is still a member, so '123.456.500'
+ * stays invalid.
  * Parser v31 (Pho, Nov 22): red-lines fix — the multi-number split
  * branches stole single-number r-splits with 4+-digit amounts
  * ('671 10000r2000' read 100 as a 2nd number, amount '00' -> red),
@@ -508,12 +517,26 @@
         var runStart = pos;
         while (pos < s.length && s[pos] === ch) pos++;
         var runLen = pos - runStart;
+        var spaceStart = pos;
         while (pos < s.length && s[pos] === ' ') pos++;
+        var hadSpace = pos > spaceStart;
         if (pos >= s.length) return invalid(raw);
         // Pho's writing (Oct 23): an ellipsis-style run ("...") before
         // the price means the rest is the TAIL, not more members:
         // 123.235.345.567...5000 = the four numbers at 5000 each.
         if (runLen >= 2) { rest = s.slice(pos); break; }
+        // v32 (Pho, Nov 28): a separator before the reverse marker is the
+        // same reverse — '245.790.657.r1000', '546,r1500', '789-097-654-r4500'.
+        // Without this the loop tries to read 'r1000' as another member and
+        // fails (red); the permutation tail regex below handles the rest.
+        if (/^(?:@|R|r|အာ)\s*\d+$/.test(s.slice(pos))) { rest = s.slice(pos); break; }
+        // v32b (Pho, Nov 28): amount tail after a separator — the amount is
+        // marked by a space and/or '=' after the separator ('576.879.009.756. 400',
+        // '456.667,879,=400', '576-800-865-790- 700', '790-321-657-=700').
+        // A bare number after a separator (no space, no '=') is still a member,
+        // so '123.456.500' stays invalid.
+        var tailRest = s.slice(pos);
+        if (/^=\s*\d+$/.test(tailRest) || (hadSpace && /^\d+$/.test(tailRest))) { rest = tailRest; break; }
         continue;
       }
       rest = s.slice(savePos);
